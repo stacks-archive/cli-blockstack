@@ -1006,7 +1006,15 @@ const CLI_ARGS = {
       ],
       minItems: 1,
       maxItems: 1,
-      help: 'Get a zone file by hash',
+      help: 'Get a zone file by hash.\n' +
+      '\n' +
+      'Example:\n' +
+      '\n' +
+      '    $ blockstack-cli get_zonefile ee77ad484b7b229f09461e4c2b6d3bd3e152ba95\n' +
+      '    $ORIGIN ryanshea.id\n' +
+      '    $TTL 3600\n' +
+      '    _http._tcp URI 10 1 "https://gaia.blockstack.org/hub/15BcxePn59Y6mYD2fRLCLCaaHScefqW2No/1/profile.json"\n' +
+      '\n',
       group: 'Peer Services',
     },
     help: {
