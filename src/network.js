@@ -304,11 +304,11 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
   }
 
   // stub out accounts 
-  getAccountStatus(address: string) : Promise<*> {
+  getAccountStatus(address: string, tokenType: string) : Promise<*> {
     if (!super.getAccountStatus) {
       throw new Error('Getting an account status is not yet implemented in blockstack.js');
     }
-    return super.getAccountStatus(address);
+    return super.getAccountStatus(address, tokenType);
   }
 
   // stub out accounts 
