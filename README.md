@@ -17,7 +17,7 @@ You can install the CLI by cloning the repo and running `npm run build`, as
 follows:
 
 ```
-$ git clone https://github.com/jcnelson/cli-blockstack
+$ git clone https://github.com/blockstack/cli-blockstack
 $ cd cli-blockstack
 $ npm install
 $ npm run build
@@ -47,7 +47,7 @@ Once this branch of blockstack.js is globally installed (or globally linked),
 you can install this CLI tool.
 
 ```
-$ git clone https://github.com/jcnelson/cli-blockstack
+$ git clone https://github.com/blockstack/cli-blockstack
 $ cd cli-blockstack
 $ npm install
 $ npm link blockstack
