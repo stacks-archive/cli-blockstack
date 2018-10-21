@@ -3062,6 +3062,9 @@ function addressConvert(network: Object, args: Array<string>) {
   let version;
   let b58addr;
   let c32addr;
+  let testnetb58addr;
+  let testnetc32addr;
+
   if (addr.match(STACKS_ADDRESS_PATTERN)) {
     c32addr = addr;
     b58addr = c32check.c32ToB58(c32addr);
@@ -3074,7 +3077,28 @@ function addressConvert(network: Object, args: Array<string>) {
     throw new Error(`Unrecognized address ${addr}`);
   }
 
-  return Promise.resolve().then(() => JSONStringify({STACKS: c32addr, BTC: b58addr}));
+  if (network.isTestnet()) {
+    testnetb58addr = network.coerceAddress(b58addr);
+    testnetc32addr = c32check.b58ToC32(testnetb58addr);
+  }
+
+  return Promise.resolve().then(() => {
+    const result = {
+      mainnet: {
+        STACKS: c32addr, 
+        BTC: b58addr
+      }
+    };
+
+    if (network.isTestnet()) {
+      result.testnet = {
+        STACKS: testnetc32addr, 
+        BTC: testnetb58addr
+      };
+    }
+
+    return JSONStringify(result)
+  })
 }
 
 /*
