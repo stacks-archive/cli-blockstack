@@ -9,7 +9,7 @@
     "prepublish": "npm run build",
     "unit-test": "npm run lint && npm run flow && npm run compile && npm run compile-tests && node ./tests/unitTests/lib/index.js",
     "build": "npm run flow && npm run compile && npm run force-executable",
-    "flow": "flow || true",
+    "flow": "flow",
     "lint": "eslint src && eslint tests",
     "test": "nyc --reporter=text npm run unit-test",
     "force-executable": "test -f ./lib/index.js && chmod +x ./lib/index.js"
@@ -94,7 +94,7 @@
     "bigi": "^1.4.2",
     "bip39": "^2.5.0",
     "bitcoinjs-lib": "^4",
-    "blockstack": "^18.0.4",
+    "blockstack": "^18.1.0",
     "blockstack-keychains": "^0.0.8",
     "c32check": "^0.0.6",
     "cors": "^2.8.4",
