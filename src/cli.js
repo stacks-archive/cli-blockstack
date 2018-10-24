@@ -63,7 +63,8 @@ import {
   gaiaConnect,
   gaiaUploadProfileAll,
   makeZoneFileFromGaiaUrl,
-  makeAssociationToken
+  makeAssociationToken,
+  getGaiaAddressFromProfile
 } from './data';
 
 import {
@@ -3000,6 +3001,10 @@ function gaiaSetHub(network: Object, args: Array<string>) {
         throw new Error('No zone file found');
       }
 
+      if (!nameProfile.apps) {
+        nameProfile.apps = {};
+      }
+
       // get owner ID-address
       const ownerAddress = network.coerceMainnetAddress(nameInfo.address);
       const idAddress = `ID-${ownerAddress}`;
@@ -3007,10 +3012,25 @@ function gaiaSetHub(network: Object, args: Array<string>) {
       // get owner and app key info 
       const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
       const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, appKeyInfo.ownerKeyIndex);
+
+      // do we already have an address set for this app?
+      let existingAppAddress;
+      let appPrivateKey;
+      try {
+        existingAppAddress = getGaiaAddressFromProfile(network, nameProfile, appOrigin);
+        appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
+      }
+      catch (e) {
+        console.log(`No profile application entry for ${appOrigin}`);
+        appPrivateKey = extractAppKey(network, appKeyInfo);
+      }
      
-      let appPrivateKey = extractAppKey(appKeyInfo);
       appPrivateKey = `${canonicalPrivateKey(appPrivateKey)}01`;
       appAddress = network.coerceMainnetAddress(getPrivateKeyAddress(network, appPrivateKey));
+
+      if (existingAppAddress && appAddress !== existingAppAddress) {
+        throw new Error(`BUG: ${existingAppAddress} !== ${appAddress}`);
+      }
 
       profile = nameProfile;
       ownerPrivateKey = ownerKeyInfo.privateKey;
