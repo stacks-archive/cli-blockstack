@@ -3103,11 +3103,12 @@ function addressConvert(network: Object, args: Array<string>) {
   }
 
   return Promise.resolve().then(() => {
-    const result = {
+    let result = {
       mainnet: {
         STACKS: c32addr, 
         BTC: b58addr
-      }
+      },
+      testnet: undefined
     };
 
     if (network.isTestnet()) {
