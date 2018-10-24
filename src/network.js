@@ -194,61 +194,9 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
       })
   }
 
-  getBlockchainNameRecordLegacy(name: string) : Promise<*> {
-    // legacy code path.
-    if (!this.nodeAPIUrl) {
-      throw new Error("No indexer URL given.  Pass -I.")
-    }
-
-    // this is EVIL code, and I'm a BAD PERSON for writing it.
-    // will be removed once the /v1/blockchains/${blockchain}/names/${name} endpoint ships.
-    const postData = '<?xml version="1.0"?>' +
-        '<methodCall><methodName>get_name_blockchain_record</methodName>' +
-        '<params><param><string>' +
-        `${name}` +
-        '</string></param></params>' +
-        '</methodCall>'
-
-    // try and guess which node we're talking to 
-    // (reminder: this is EVIL CODE that WILL BE REMOVED as soon as possible)
-    return fetch(`${this.nodeAPIUrl}/RPC2`,
-               { method: 'POST',
-                 body: postData })
-      .then((resp) => {
-        if (resp.status >= 200 && resp.status <= 299){
-          return resp.text();
-        }
-        else {
-          throw new Error(`Bad response code: ${resp.status}`);
-        }
-      })
-      .then((respText) => {
-        // response is a single string
-        const start = respText.indexOf('<string>') + '<string>'.length
-        const stop = respText.indexOf('</string>')
-        const dataResp = respText.slice(start, stop);
-        let dataJson = null;
-        try {
-          dataJson = JSON.parse(dataResp);
-          if (!dataJson.record) {
-            // error response 
-            return dataJson
-          }
-          const nameRecord = dataJson.record;
-          if (nameRecord.hasOwnProperty('history')) {
-            // don't return history, since this is not expected in the new API
-            delete nameRecord.history;
-          }
-          return nameRecord;
-        }
-        catch(e) {
-          throw new Error('Invalid JSON returned (legacy codepath)');
-        }
-      });
-  }
 
   getBlockchainNameRecord(name: string) : Promise<*> {
-    // TODO: send to blockstack.js, once we can drop the legacy code path 
+    // TODO: send to blockstack.js
     const url = `${this.blockstackAPIUrl}/v1/blockchains/bitcoin/names/${name}`
     return fetch(url)
       .then((resp) => {
@@ -301,48 +249,6 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
         }
         return fixedHistory
       })
-  }
-
-  // stub out accounts 
-  getAccountStatus(address: string, tokenType: string) : Promise<*> {
-    if (!super.getAccountStatus) {
-      throw new Error('Getting an account status is not yet implemented in blockstack.js');
-    }
-    return super.getAccountStatus(address, tokenType);
-  }
-
-  // stub out accounts 
-  getAccountHistoryPage(address: string, page: number): Promise<*> {
-    if (!super.getAccountHistoryPage) {
-      return Promise.resolve().then(() => []);
-    }
-    return super.getAccountHistoryPage(address, page);
-  }
-
-  // stub out accounts 
-  getAccountBalance(address: string, tokenType: string): Promise<*> {
-    if (!super.getAccountBalance) {
-      return Promise.resolve().then(() => bigi.fromByteArrayUnsigned('0'));
-    }
-    return super.getAccountBalance(address, tokenType);
-  }
-
-  // stub out accounts 
-  getAccountAt(address: string, blockHeight: number): Promise<*> {
-    if (!super.getAccountAt) {
-      return Promise.resolve().then(() => []);
-    }
-    return super.getAccountAt(address, blockHeight);
-  }
-
-  // stub out accounts 
-  getAccountTokens(address: string): Promise<*> {
-    if (!super.getAccountTokens) {
-      return Promise.resolve().then(() => {
-        return { tokens: [] };
-      });
-    }
-    return super.getAccountTokens(address);
   }
 }
 
