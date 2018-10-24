@@ -644,7 +644,7 @@ export function getIDAppKeys(network: Object,
     })
     .then((idAddress) => {
       const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
-      appPrivateKey = extractAppKey(appKeyInfo);
+      appPrivateKey = extractAppKey(network, appKeyInfo);
       ownerPrivateKey = getOwnerKeyFromIDAddress(network, mnemonic, idAddress);
       const ret = {
         appPrivateKey,
