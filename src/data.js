@@ -301,3 +301,44 @@ export function makeZoneFileFromGaiaUrl(network: Object, name: string,
     });
 }
 
+/*
+ * Given a Gaia bucket URL, extract its address
+ */
+export function getGaiaAddressFromURL(appUrl: string): string {
+    const matches = appUrl.match(/([13][a-km-zA-HJ-NP-Z0-9]{26,35})/)
+    if (!matches) {
+      throw new Error('Failed to parse gaia address')
+    }
+    return matches[matches.length - 1]
+}
+
+
+/*
+ * Given a profile and an app origin, find its app address
+ * Returns the address on success
+ * Throws on error or not found
+ */
+export function getGaiaAddressFromProfile(network: Object, profile: Object, appOrigin: string): string {
+  if (!profile) {
+    throw new Error('No profile');
+  }
+  if (!profile.apps) {
+    throw new Error('No profile apps');
+  }
+  if (!profile.apps[appOrigin]) {
+    throw new Error(`No app entry for ${appOrigin}`);
+  }
+      
+  // do we already have an address set for this app?
+  const appUrl = profile.apps[appOrigin];
+  let existingAppAddress;
+  // what's the address?
+  try {
+    existingAppAddress = network.coerceMainnetAddress(getGaiaAddressFromURL(appUrl));
+  }
+  catch (e) {
+    throw new Error(`Failed to parse app URL ${appUrl}`);
+  }
+
+  return existingAppAddress;
+}
