@@ -15,6 +15,8 @@ import {
   getPrivateKeyAddress
 } from './utils';
 
+import type BIP32 from 'bip32';
+
 export const STRENGTH = 128;   // 12 words
 
 function toPrivkeyHex(k : Object) : string {
@@ -24,6 +26,10 @@ function toPrivkeyHex(k : Object) : string {
 function walletFromMnemonic(mnemonic: string): blockstack.BlockstackWallet {
   const seed = bip39.mnemonicToSeed(mnemonic)
   return new blockstack.BlockstackWallet(bip32.fromSeed(seed))
+}
+
+function getNodePrivateKey(node: BIP32): string {
+  return blockstack.ecPairToHexString(bitcoin.ECPair.fromPrivateKey(node.privateKey))
 }
 
 /*
@@ -46,7 +52,7 @@ export function getOwnerKeyInfo(network: Object,
   const wallet = walletFromMnemonic(mnemonic);
   const identity = wallet.getIdentityAddressNode(index);
   const addr = network.coerceAddress(blockstack.BlockstackWallet.getAddressFromBIP32Node(identity));
-  const privkey = identity.getSKHex();
+  const privkey = getNodePrivateKey(identity);
   return {
     privateKey: privkey,
     version: version,
