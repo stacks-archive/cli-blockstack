@@ -201,7 +201,7 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
     return fetch(url)
       .then((resp) => {
         if (resp.status !== 200) {
-          return this.getBlockchainNameRecordLegacy(name);
+          throw new Error(`Bad response status: ${resp.status}`)
         }
         else {
           return resp.json();
@@ -227,7 +227,7 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
         if (resp.status !== 200) {
           throw new Error(`Bad response status: ${resp.status}`)
         }
-        return resp.json();
+        return resp.json()
       })
       .then((historyInfo) => {
         // coerce all addresses 
