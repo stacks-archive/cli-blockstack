@@ -3352,6 +3352,7 @@ export function CLIMain() {
     const consensusHash = opts['C'];
     const integration_test = opts['i'];
     const testnet = opts['t'];
+    const magicBytes = opts['m'];
     const apiUrl = opts['H'];
     const transactionBroadcasterUrl = opts['T'];
     const nodeAPIUrl = opts['I'];
@@ -3394,8 +3395,11 @@ export function CLIMain() {
     };
 
     // wrap command-line options
-    const blockstackNetwork = new CLINetworkAdapter(
-        getNetwork(configData, (!!BLOCKSTACK_TEST || !!integration_test || !!testnet)), cliOpts);
+    const wrappedNetwork = getNetwork(configData, (!!BLOCKSTACK_TEST || !!integration_test || !!testnet));
+    const blockstackNetwork = new CLINetworkAdapter(wrappedNetwork, cliOpts);
+    if (magicBytes) {
+      blockstackNetwork.setMagicBytes(magicBytes)
+    }
 
     blockstack.config.network = blockstackNetwork;
     blockstack.config.logLevel = 'error';
