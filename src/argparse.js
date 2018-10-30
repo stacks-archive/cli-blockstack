@@ -2222,6 +2222,8 @@ Options can be:
     -e                  Estimate the BTC cost of an transaction (in satoshis).
                         Do not generate or send any transactions.
 
+    -m MAGIC_BYTES      Use an alternative magic byte string instead of "id".
+
     -t                  Use the public testnet instead of mainnet.
 
     -i                  Use integration test framework instead of mainnet.
@@ -2512,7 +2514,7 @@ export function printUsage() {
  * The key _ is mapped to the non-opts list.
  */
 export function getCLIOpts(argv: Array<string>, 
-                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:') : Object {
+                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:') : Object {
   let optsTable = {};
   let remainingArgv = [];
   let argvBuff = argv.slice(0);
