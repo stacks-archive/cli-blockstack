@@ -159,7 +159,7 @@ const CLI_ARGS = {
           pattern: '.+',
         },
         {
-          name: 'profileGaiaHub',
+          name: 'profile_gaia_hub',
           type: 'string',
           realtype: 'url',
           pattern: URL_PATTERN,
@@ -2587,7 +2587,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
   // scan for keywords 
   for (let i = 0; i < argsList.length; i++) {
     if (argsList[i].startsWith('--')) {
-      // positional argument 
+      // keyword argument 
       const argName = argsList[i].slice(2);
       let argValue = null;
 
@@ -2618,7 +2618,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
       }
 
       if (argValue) {
-        // found something!
+        // found an argument given as a keyword
         i += 1;
         foundArgs[argName] = argValue;
       }
@@ -2641,28 +2641,29 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
   let orderedArgIndex = 0;
 
   for (let i = 0; i < commandProps.length; i++) {
-    if (!commandProps[i].hasOwnProperty('name')) {
-      // positional argument
-      if (orderedArgIndex >= orderedArgs.length) {
-        break;
+    if (orderedArgIndex < orderedArgs.length) {
+      if (!commandProps[i].hasOwnProperty('name')) {
+        // unnamed positional argument 
+        mergedArgs.push(orderedArgs[orderedArgIndex]);
+        orderedArgIndex += 1;
       }
-      mergedArgs.push(orderedArgs[orderedArgIndex]);
-      orderedArgIndex += 1;
-    }
-    else if (!foundArgs.hasOwnProperty(commandProps[i].name)) {
-      // positional argument 
-      if (orderedArgIndex >= orderedArgs.length) {
-        break;
+      else if (!foundArgs.hasOwnProperty(commandProps[i].name)) {
+        // named positional argument, NOT given as a keyword
+        mergedArgs.push(orderedArgs[orderedArgIndex]);
+        orderedArgIndex += 1;
       }
-      mergedArgs.push(orderedArgs[orderedArgIndex]);
-      orderedArgIndex += 1;
+      else {
+        // keyword argument
+        mergedArgs.push(foundArgs[commandProps[i].name]);
+      }
     }
     else {
-      // keyword argument 
+      // keyword argument (possibly undefined)
       mergedArgs.push(foundArgs[commandProps[i].name]);
     }
   }
 
+  console.log(`merged args: ${JSON.stringify(mergedArgs)}`);
   return {
     'status': true,
     'arguments': mergedArgs
@@ -2720,11 +2721,23 @@ export function checkArgs(argList: Array<string>)
 
   const commandArgs = parsedCommandArgs.arguments;
 
-  const commands = new Object();
-  commands[commandName] = commandArgs;
+  // validate all required commands as given.
+  // if there are optional commands, then only validate
+  // them if they're given.
+  const commandSchema = JSON.parse(JSON.stringify(CLI_ARGS.properties[commandName]));
+  for (let i = commandSchema.minItems; i < commandSchema.maxItems; i++) {
+    if (i < commandArgs.length) {
+      if (commandArgs[i] === null || commandArgs[i] === undefined) {
+        // optional argument not given.  Update the schema we're checking against
+        // to expect this.
+        commandArgs[i] = null;
+        commandSchema.items[i] = { type: "null" };
+      }
+    }
+  }
 
   const ajv = Ajv();
-  const valid = ajv.validate(CLI_ARGS, commands);
+  const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
      // console.error(ajv.errors);
      return {
