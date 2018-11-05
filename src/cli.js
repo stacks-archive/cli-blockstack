@@ -237,7 +237,7 @@ function getNameHistoryRecord(network: Object, args: Array<string>) {
   const name = args[0];
   let page;
 
-  if (args.length >= 2) {
+  if (args.length >= 2 && !!args[1]) {
     page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getNameHistory(name, page);
@@ -468,11 +468,11 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
   let zonefileHash = null;
   let zonefile = null;
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     zonefilePath = args[3];
   }
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     zonefileHash = args[4];
     zonefilePath = null;
 
@@ -610,7 +610,7 @@ function makeZonefile(network: Object, args: Array<string>) {
     throw new Error("ID-address must start with ID-");
   }
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     resolver = args[3];
   }
 
@@ -662,7 +662,7 @@ function update(network: Object, args: Array<string>) {
   let zonefile = null;
   let zonefileHash = null;
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     zonefileHash = args[4];
     zonefilePath = null;
     logger.debug(`Using zone file hash ${zonefileHash} instead of zone file`);
@@ -886,7 +886,7 @@ function renew(network: Object, args: Array<string>) {
   let zonefileHash = null;
   let zonefile = null;
 
-  if (args.length >= 4) {
+  if (args.length >= 4 && !!args[3]) {
     // ID-address
     newAddress = args[3].slice(3);
   }
@@ -894,11 +894,11 @@ function renew(network: Object, args: Array<string>) {
     newAddress = getPrivateKeyAddress(network, ownerKey);
   }
 
-  if (args.length >= 5) {
+  if (args.length >= 5 && !!args[4]) {
     zonefilePath = args[4];
   }
 
-  if (args.length >= 6) {
+  if (args.length >= 6 && !!args[5]) {
     zonefileHash = args[5];
     zonefilePath = null;
     logger.debug(`Using zone file hash ${zonefileHash} instead of zone file`);
@@ -1702,7 +1702,7 @@ function register(network: Object, args: Array<string>) {
 
   let zonefilePromise = null;
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefilePromise = Promise.resolve().then(() => fs.readFileSync(zonefilePath).toString());
   }
@@ -1833,7 +1833,7 @@ function registerAddr(network: Object, args: Array<string>) {
   const mainnetAddress = network.coerceMainnetAddress(address)
 
   let zonefile = "";
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefile = fs.readFileSync(zonefilePath).toString();
   }
@@ -1967,7 +1967,7 @@ function registerSubdomain(network: Object, args: Array<string>) {
   logger.warn(`WARNING: not yet able to verify that ${registrarUrl} is the registrar ` +
               `for ${onChainName}; assuming that it is...`);
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefilePromise = Promise.resolve().then(() => fs.readFileSync(zonefilePath).toString());
   }
@@ -2243,7 +2243,7 @@ function getAppKeys(network: Object, args: Array<string>) {
 function getOwnerKeys(network: Object, args: Array<string>) {
   const mnemonicPromise = getBackupPhrase(args[0]);
   let maxIndex = 1;
-  if (args.length > 1) {
+  if (args.length > 1 && !!args[1]) {
     maxIndex = parseInt(args[1]);
   }
 
@@ -2365,7 +2365,7 @@ function balance(network: Object, args: Array<string>) {
 function getAccountHistory(network: Object, args: Array<string>) {
   const address = c32check.c32ToB58(args[0]);
 
-  if (args.length >= 2) {
+  if (args.length >= 2 && !!args[1]) {
     const page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getAccountHistoryPage(address, page);
@@ -2495,7 +2495,7 @@ function sendTokens(network: Object, args: Array<string>) {
   const privateKey = decodePrivateKey(args[3]);
   let memo = "";
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     memo = args[4];
   }
 
@@ -2638,11 +2638,11 @@ function gaiaGetFile(network: Object, args: Array<string>) {
   let decrypt = false;
   let verify = false;
 
-  if (!!appPrivateKey && args.length > 4) {
+  if (!!appPrivateKey && args.length > 4 && !!args[4]) {
     decrypt = (args[4].toLowerCase() === 'true' || args[4].toLowerCase() === '1');
   }
 
-  if (!!appPrivateKey && args.length > 5) {
+  if (!!appPrivateKey && args.length > 5 && !!args[5]) {
     verify = (args[5].toLowerCase() === 'true' || args[5].toLowerCase() === '1');
   }
 
@@ -2688,10 +2688,10 @@ function gaiaPutFile(network: Object, args: Array<string>) {
   let encrypt = false;
   let sign = false;
   
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     encrypt = (args[4].toLowerCase() === 'true' || args[4].toLowerCase() === '1');
   }
-  if (args.length > 5) {
+  if (args.length > 5 && !!args[5]) {
     sign = (args[5].toLowerCase() === 'true' || args[5].toLowerCase() === '1');
   }
   
@@ -3138,11 +3138,11 @@ function authDaemon(network: Object, args: Array<string>) {
   let port = 8888;  // default port
   let profileGaiaHub = gaiaHubUrl;
 
-  if (args.length > 2) {
+  if (args.length > 2 && !!args[2]) {
     profileGaiaHub = args[2];
   }
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     port = parseInt(args[3]);
   }
 
@@ -3190,7 +3190,7 @@ function encryptMnemonic(network: Object, args: Array<string>) {
 
   const passwordPromise = new Promise((resolve, reject) => {
     let pass = '';
-    if (args.length === 2) {
+    if (args.length === 2 && !!args[1]) {
       pass = args[1];
       resolve(pass);
     }
@@ -3234,7 +3234,7 @@ function decryptMnemonic(network: Object, args: Array<string>) {
   const ciphertext = args[0];
  
   const passwordPromise = new Promise((resolve, reject) => {
-    if (args.length === 2) {
+    if (args.length === 2 && !!args[1]) {
       const pass = args[1];
       resolve(pass);
     }
@@ -3328,7 +3328,6 @@ export function CLIMain() {
 
   const cmdArgs = checkArgs(opts._);
   if (!cmdArgs.success) {
-    console.error(cmdArgs.error);
     if (cmdArgs.usage) {
       if (cmdArgs.command) {
         console.log(makeCommandUsageString(cmdArgs.command));
@@ -3398,7 +3397,7 @@ export function CLIMain() {
     const wrappedNetwork = getNetwork(configData, (!!BLOCKSTACK_TEST || !!integration_test || !!testnet));
     const blockstackNetwork = new CLINetworkAdapter(wrappedNetwork, cliOpts);
     if (magicBytes) {
-      blockstackNetwork.setMagicBytes(magicBytes)
+      blockstackNetwork.MAGIC_BYTES = magicBytes;
     }
 
     blockstack.config.network = blockstackNetwork;
