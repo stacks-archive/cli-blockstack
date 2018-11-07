@@ -2708,52 +2708,6 @@ function gaiaPutFile(network: Object, args: Array<string>) {
     });
 }
 
-/*
- * Go in a tail-recursion loop to apply a calback on a Gaia hub's files.
- */
-function gaiaListFilesLoop(hubConfig: Object, page: string | null, 
-                           count: number, fileCount: number, callback: (name: string) => boolean) {
-  if (count > 65536) {
-    // this is ridiculously huge 
-    throw new Error('Too many entries to list');
-  }
-
-  let httpStatus;
-  const pageRequest = JSON.stringify({ page: page });
-  return fetch(`${hubConfig.server}/list-files/${hubConfig.address}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': `${pageRequest.length}`,
-        'Authorization': `bearer ${hubConfig.token}`,
-      },
-      body: pageRequest
-    })
-    .then((response) => {
-      httpStatus = response.status;
-      return response.text();
-    })
-    .then((responseText) => JSON.parse(responseText))
-    .then((responseJSON) => {
-      const entries = responseJSON.entries;
-      const nextPage = responseJSON.page;
-      if (entries === null || entries === undefined) {
-        throw new Error('Malformed response: no entries');
-      }
-      for (let i = 0; i < entries.length; i++) {
-        callback(entries[i]);
-      }
-      if (nextPage && entries.length > 0) {
-        // keep going 
-        return gaiaListFilesLoop(hubConfig, nextPage, count+1,
-            fileCount + entries.length, callback);
-      }
-      else {
-        return Promise.resolve(JSONStringify(fileCount + entries.length));
-      }
-    });
-}
 
 /*
  * List files in a Gaia hub
@@ -2767,9 +2721,9 @@ function gaiaListFiles(network: Object, args: Array<string>) {
 
   // force mainnet addresses 
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
-  return blockstack.connectToGaiaHub(hubUrl, canonicalPrivateKey(appPrivateKey))
-    .then((hubConfig) => {
-      return gaiaListFilesLoop(hubConfig, null, 0, 0, (name) => {
+  return gaiaAuth(canonicalPrivateKey(appPrivateKey), hubUrl)
+    .then((userData) => {
+      return blockstack.listFiles((name) => {
         console.log(name);
         return true;
       });
@@ -2872,11 +2826,14 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
       mnemonic = keyInfo.mnemonic;
       appPrivateKey = keyInfo.appPrivateKey;
       ownerPrivateKey = keyInfo.ownerPrivateKey;
-      return gaiaConnect(network, hubUrl, appPrivateKey, ownerPrivateKey)
+      return gaiaAuth(appPrivateKey, hubUrl, ownerPrivateKey);
+    })
+    .then((userData) => {
+      return gaiaConnect(network, hubUrl, appPrivateKey);
     })
     .then((hubConfig) => {
       gaiaHubConfig = hubConfig;
-      return gaiaListFilesLoop(hubConfig, null, 0, 0, (name) => {
+      return blockstack.listFiles((name) => {
         fileNames.push(name);
         return true;
       });
