@@ -2663,7 +2663,6 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
     }
   }
 
-  console.log(`merged args: ${JSON.stringify(mergedArgs)}`);
   return {
     'status': true,
     'arguments': mergedArgs
