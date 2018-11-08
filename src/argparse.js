@@ -2437,10 +2437,13 @@ export function makeAllCommandsHelp(): string {
 /*
  * Make a usage string for a single command
  */
-export function makeCommandUsageString(command: string) : string {
+export function makeCommandUsageString(command: ?string) : string {
   let res = "";
   if (command === 'all') {
     return makeAllCommandsHelp();
+  }
+  if (!command) {
+    return makeAllCommandsList();
   }
 
   const commandInfo = CLI_ARGS.properties[command];
@@ -2675,7 +2678,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
 type checkArgsSuccessType = {
   'success': true,
   'command': string,
-  'args': Array<string>
+  'args': Array<?string>
 };
 
 type checkArgsFailType = {
