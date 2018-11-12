@@ -65,15 +65,14 @@ export function getOwnerKeyInfo(network: Object,
  * Get the payment key information for a 12-word phrase.
  * @network (object) the blockstack network
  * @mnemonic (string) the 12-word phrase
- * 
+ *
  * Returns an object with:
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
 export function getPaymentKeyInfo(network: Object, mnemonic : string) {
   const wallet = walletFromMnemonic(mnemonic);
-  const paymentNode = wallet.getBitcoinPrivateKeychain();
-  const privkey = toPrivkeyHex(paymentNode);
+  const privkey = wallet.getBitcoinPrivateKey(0);
   const addr = getPrivateKeyAddress(network, privkey);
   return {
     privateKey: privkey,
