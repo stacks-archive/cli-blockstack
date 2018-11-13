@@ -15,6 +15,10 @@ import {
   getPrivateKeyAddress
 } from './utils';
 
+import {
+  getMaxIDSearchIndex
+} from './cli';
+
 import type BIP32 from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
@@ -90,9 +94,9 @@ export function getPaymentKeyInfo(network: Object, mnemonic : string) {
  * Returns the index if found
  * Returns -1 if not found
  */
-export function findIdentityIndex(network: Object, mnemonic: string, idAddress: string, maxIndex: ?number = 16) {
+export function findIdentityIndex(network: Object, mnemonic: string, idAddress: string, maxIndex: ?number) {
   if (!maxIndex) {
-    maxIndex = 16;
+    maxIndex = getMaxIDSearchIndex();
   }
 
   if (idAddress.substring(0,3) !== 'ID-') {
@@ -103,6 +107,7 @@ export function findIdentityIndex(network: Object, mnemonic: string, idAddress: 
   for (let i = 0; i < maxIndex; i++) {
     const identity = wallet.getIdentityAddressNode(i);
     const addr = blockstack.BlockstackWallet.getAddressFromBIP32Node(identity);
+
     if (network.coerceAddress(addr) ===
         network.coerceAddress(idAddress.slice(3))) {
       return i;
