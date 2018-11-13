@@ -100,6 +100,8 @@ export const DEFAULT_CONFIG_PATH = '~/.blockstack-cli.conf'
 export const DEFAULT_CONFIG_REGTEST_PATH = '~/.blockstack-cli-regtest.conf'
 export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf'
 
+export const DEFAULT_MAX_ID_SEARCH_INDEX = 256
+
 // CLI usage
 const CLI_ARGS = {
   type: 'object',
@@ -813,9 +815,15 @@ const CLI_ARGS = {
           realtype: 'blockstack_id',
           pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
         },
+        {
+          name: 'page',
+          type: 'string',
+          realtype: 'page_number',
+          pattern: '^[0-9]+$',
+        }
       ],
       minItems: 1,
-      maxItems: 1,
+      maxItems: 2,
       help: 'Get the low-level blockchain-hosted history of operations on a Blocktack ID.  ' +
       'This command is used mainly for debugging and diagnostics, and is not guaranteed to ' +
       'be stable across releases.',
@@ -2252,6 +2260,9 @@ Options can be:
 
     -I URL              Use an alternative Blockstack Core Indexer endpoint.
 
+    -M MAX_INDEX        Maximum keychain index to use when searching for an identity address
+                        (default is ${DEFAULT_MAX_ID_SEARCH_INDEX}).
+
     -N PAY2NS_PERIOD    Number of blocks in which a namespace receives the registration
                         and renewal fees after it is created (DANGEROUS)
 
@@ -2514,7 +2525,7 @@ export function printUsage() {
  * The key _ is mapped to the non-opts list.
  */
 export function getCLIOpts(argv: Array<string>, 
-                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:') : Object {
+                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : Object {
   let optsTable = {};
   let remainingArgv = [];
   let argvBuff = argv.slice(0);
