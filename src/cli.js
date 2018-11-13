@@ -45,7 +45,8 @@ import {
   DEFAULT_CONFIG_TESTNET_PATH,
   ADDRESS_PATTERN,
   ID_ADDRESS_PATTERN,
-  STACKS_ADDRESS_PATTERN
+  STACKS_ADDRESS_PATTERN,
+  DEFAULT_MAX_ID_SEARCH_INDEX
 } from './argparse';
 
 import {
@@ -101,8 +102,13 @@ let safetyChecks = true;
 let receiveFeesPeriod = 52595;
 let gracePeriod = 5000;
 let noExit = false;
+let maxIDSearchIndex = DEFAULT_MAX_ID_SEARCH_INDEX;
 
 let BLOCKSTACK_TEST = process.env.BLOCKSTACK_TEST ? true : false;
+
+export function getMaxIDSearchIndex() {
+  return maxIDSearchIndex;
+}
 
 /*
  * Get a name's record information
@@ -237,7 +243,7 @@ function getNameHistoryRecord(network: Object, args: Array<string>) {
   const name = args[0];
   let page;
 
-  if (args.length >= 2 && !!args[1]) {
+  if (args.length >= 2 && args[1] !== null && args[1] !== undefined) {
     page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getNameHistory(name, page);
@@ -3303,6 +3309,7 @@ export function CLIMain() {
     safetyChecks = !opts['U'];
     receiveFeesPeriod = opts['N'] ? parseInt(opts['N']) : receiveFeesPeriod;
     gracePeriod = opts['G'] ? parseInt(opts['G']) : gracePeriod;
+    maxIDSearchIndex = opts['M'] ? parseInt(opts['M']) : maxIDSearchIndex;
 
     const debug = opts['d']
     const consensusHash = opts['C'];
