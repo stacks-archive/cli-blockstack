@@ -20,6 +20,7 @@ import { ECPair } from 'bitcoinjs-lib';
 const secp256k1 = ecurve.getCurveByName('secp256k1');
 
 import {
+  PRIVATE_KEY_NOSIGN_PATTERN,
   PRIVATE_KEY_PATTERN,
   PRIVATE_KEY_MULTISIG_PATTERN,
   PRIVATE_KEY_SEGWIT_P2SH_PATTERN,
@@ -46,14 +47,36 @@ type UTXO = { value?: number,
               tx_output_n: number }
 
 
+export class NullSigner implements TransactionSigner {
+  address: string
+  isComplete: bool
+
+  constructor(address: string) {
+    this.address = address
+    this.isComplete = false
+  }
+
+  getAddress() : Promise<string> {
+    return Promise.resolve().then(() => this.address);
+  }
+
+  signTransaction(txIn: bitcoinjs.TransactionBuilder, signingIndex: number) : Promise<void> {
+    return Promise.resolve().then(() => {})
+  }
+}
+
+
 export class MultiSigKeySigner implements TransactionSigner {
   redeemScript: Buffer
   privateKeys: Array<string>
   address: string
   m: number
+  isComplete: bool
+
   constructor(redeemScript: string, privateKeys: Array<string>) {
     this.redeemScript = Buffer.from(redeemScript, 'hex')
     this.privateKeys = privateKeys
+    this.isComplete = true
     try {
       // try to deduce m (as in m-of-n)
       const chunks = bitcoinjs.script.decompile(this.redeemScript)
@@ -90,6 +113,7 @@ export class SegwitP2SHKeySigner implements TransactionSigner {
   privateKeys: Array<string>
   address: string
   m: number
+  isComplete: bool
 
   constructor(redeemScript: string, witnessScript: string, m: number, privateKeys: Array<string>) {
     this.redeemScript = Buffer.from(redeemScript, 'hex');
@@ -100,6 +124,7 @@ export class SegwitP2SHKeySigner implements TransactionSigner {
    
     this.privateKeys = privateKeys;
     this.m = m;
+    this.isComplete = true
   }
 
   getAddress() : Promise<string> {
@@ -163,6 +188,29 @@ export class SafetyError extends Error {
     super(JSONStringify(safetyErrors, true));
     this.safetyErrors = safetyErrors;
   }
+}
+
+export function hasKeys(signer: String | TransactionSigner) : bool {
+  if (typeof signer === 'string') {
+    return true;
+  }
+  else {
+    return signer.isComplete;
+  }
+}
+
+/*
+ * Parse a string into a NullSigner
+ * The string has the format "nosign:address"
+ * @return a NullSigner instance
+ */
+export function parseNullSigner(addrString: string) : NullSigner {
+  if (!addrString.startsWith("nosign:")) {
+    throw new Error("Invalid nosign string");
+  }
+
+  const addr = addrString.slice("nosign:".length);
+  return new NullSigner(addr);
 }
 
 
@@ -269,6 +317,12 @@ export function parseSegwitP2SHKeys(serializedPrivateKeys: string) : SegwitP2SHK
  * @return a TransactionSigner or a String
  */
 export function decodePrivateKey(serializedPrivateKey: string) : string | TransactionSigner {
+  const nosignMatches = serializedPrivateKey.match(PRIVATE_KEY_NOSIGN_PATTERN);
+  if (!!nosignMatches) {
+    // no private key 
+    return parseNullSigner(serializedPrivateKey);
+  }
+
   const singleKeyMatches = serializedPrivateKey.match(PRIVATE_KEY_PATTERN);
   if (!!singleKeyMatches) {
     // one private key 
