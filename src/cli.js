@@ -33,6 +33,7 @@ import {
 } from './keys';
 
 import {
+  CLI_ARGS,
   getCLIOpts,
   printUsage,
   checkArgs,
@@ -87,7 +88,8 @@ import {
   getBackupPhrase,
   mkdirs,
   getIDAddress,
-  getIDAppKeys
+  getIDAppKeys,
+  hasKeys
 } from './utils';
 
 import {
@@ -331,7 +333,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
   const namespaceID = name.split('.').slice(-1)[0];
 
   const txPromise = blockstack.transactions.makePreorder(
-    name, address, paymentKey);
+    name, address, paymentKey, !hasKeys(paymentKey));
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
@@ -506,7 +508,7 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
       });
 
   const txPromise = blockstack.transactions.makeRegister(
-    name, address, paymentKey, zonefile, zonefileHash);
+    name, address, paymentKey, zonefile, zonefileHash, !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -666,7 +668,7 @@ function update(network: Object, args: Array<string>) {
   const paymentKey = decodePrivateKey(args[3]);
 
   let zonefile = null;
-  let zonefileHash = null;
+  let zonefileHash = '';
 
   if (args.length > 4 && !!args[4]) {
     zonefileHash = args[4];
@@ -696,7 +698,7 @@ function update(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeUpdate(
-    name, ownerKey, paymentKey, zonefile, zonefileHash);
+    name, ownerKey, paymentKey, zonefile, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -800,7 +802,7 @@ function transfer(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeTransfer(
-    name, address, ownerKey, paymentKey, keepZoneFile);
+    name, address, ownerKey, paymentKey, keepZoneFile, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -958,7 +960,7 @@ function renew(network: Object, args: Array<string>) {
 
   const txPromise = zonefilePromise.then((zonefileData) => {
     return blockstack.transactions.makeRenewal(
-      name, newAddress, ownerKey, paymentKey, zonefileData, zonefileHash);
+      name, newAddress, ownerKey, paymentKey, zonefileData, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
   });
 
   if (estimateOnly) {
@@ -1077,7 +1079,7 @@ function revoke(network: Object, args: Array<string>) {
     });
 
   const txPromise =  blockstack.transactions.makeRevoke(
-    name, ownerKey, paymentKey);
+    name, ownerKey, paymentKey, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -1156,7 +1158,7 @@ function namespacePreorder(network: Object, args: Array<string>) {
   const paymentAddress = getPrivateKeyAddress(network, paymentKey);
 
   const txPromise = blockstack.transactions.makeNamespacePreorder(
-    namespaceID, address, paymentKey);
+    namespaceID, address, paymentKey, !hasKeys(paymentKey));
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
@@ -1300,7 +1302,7 @@ function namespaceReveal(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeNamespaceReveal(
-    namespace, revealAddr, paymentKey);
+    namespace, revealAddr, paymentKey, !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -1378,7 +1380,7 @@ function namespaceReady(network: Object, args: Array<string>) {
   const revealAddress = getPrivateKeyAddress(network, revealKey);
 
   const txPromise = blockstack.transactions.makeNamespaceReady(
-    namespaceID, revealKey);
+    namespaceID, revealKey, !hasKeys(revealKey));
 
   const revealUTXOsPromise = network.getUTXOs(revealAddress);
 
@@ -1513,7 +1515,7 @@ function nameImport(network: Object, args: Array<string>) {
   const importAddress = getPrivateKeyAddress(network, importKey);
 
   const txPromise = blockstack.transactions.makeNameImport(
-    name, recipientAddr, zonefileHash, importKey);
+    name, recipientAddr, zonefileHash, importKey, !hasKeys(importKey));
 
   const importUTXOsPromise = network.getUTXOs(importAddress);
 
@@ -1619,7 +1621,7 @@ function announce(network: Object, args: Array<string>) {
   const senderAddress = getPrivateKeyAddress(network, senderKey);
 
   const txPromise = blockstack.transactions.makeAnnounce(
-    messageHash, senderKey);
+    messageHash, senderKey, !hasKeys(senderKey));
 
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
@@ -1749,7 +1751,7 @@ function register(network: Object, args: Array<string>) {
 
     // will have only gotten back the raw tx (which we'll discard anyway,
     // since we have to use the right UTXOs)
-    return blockstack.transactions.makePreorder(name, address, paymentKey);
+    return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
   })
   .then((rawTx) => {
     preorderTx = rawTx;
@@ -1763,7 +1765,7 @@ function register(network: Object, args: Array<string>) {
   })
   .then(() => {
     // now we can make the NAME_REGISTRATION 
-    return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile);
+    return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
   })
   .then((rawTx) => {
     registerTx = rawTx;
@@ -1888,7 +1890,7 @@ function registerAddr(network: Object, args: Array<string>) {
 
       // will have only gotten back the raw tx (which we'll discard anyway,
       // since we have to use the right UTXOs)
-      return blockstack.transactions.makePreorder(name, address, paymentKey);
+      return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
     })
     .then((rawTx) => {
       preorderTx = rawTx;
@@ -1902,7 +1904,7 @@ function registerAddr(network: Object, args: Array<string>) {
     })
     .then(() => {
       // now we can make the NAME_REGISTRATION 
-      return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile);
+      return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
     })
     .then((rawTx) => {
       registerTx = rawTx;
@@ -2458,7 +2460,7 @@ function sendBTC(network: Object, args: Array<string>) {
     paymentKey = paymentKeyHex;
   }
 
-  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount)
+  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount, !hasKeys(paymentKey))
     .catch((e) => {
       if (e.name === 'InvalidAmountError') {
         return JSONStringify({
@@ -2509,7 +2511,7 @@ function sendTokens(network: Object, args: Array<string>) {
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
   const txPromise = blockstack.transactions.makeTokenTransfer(
-    recipientAddress, tokenType, tokenAmount, memo, privateKey);
+    recipientAddress, tokenType, tokenAmount, memo, privateKey, !hasKeys(privateKey));
 
   const estimatePromise = senderUTXOsPromise.then((utxos) => {
     const numUTXOs = utxos.length;
@@ -3223,6 +3225,39 @@ function decryptMnemonic(network: Object, args: Array<string>) {
     });
 }
 
+/* Print out all documentation on usage in JSON 
+ */
+function printDocs(network: Object, args: Array<string>) {
+  return Promise.resolve().then(() => {
+    const formattedDocs = [];
+    const commandNames = Object.keys(CLI_ARGS.properties);
+    for (let i = 0; i < commandNames.length; i++) {
+      const commandName = commandNames[i];
+      const args = [];
+      const usage = CLI_ARGS.properties[commandName].help;
+      const group = CLI_ARGS.properties[commandName].group;
+
+      for (let j = 0; j < CLI_ARGS.properties[commandName].items.length; j++) {
+        const argItem = CLI_ARGS.properties[commandName].items[j];
+        args.push({
+          name: argItem.name,
+          type: argItem.type,
+          value: argItem.realtype,
+          format: argItem.pattern ? argItem.pattern : '.+'
+        });
+      }
+
+      formattedDocs.push({
+        command: commandName,
+        args: args,
+        usage: usage,
+        group: group
+      });
+    }
+    return JSONStringify(formattedDocs);
+  });
+}
+
 /*
  * Decrypt a backup phrase
  * args:
@@ -3236,6 +3271,7 @@ const COMMANDS = {
   'balance': balance,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
+  'docs': printDocs,
   'encrypt_keychain': encryptMnemonic,
   'gaia_dump_bucket': gaiaDumpBucket,
   'gaia_getfile': gaiaGetFile,
