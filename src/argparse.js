@@ -32,6 +32,10 @@ export const PRIVATE_KEY_PATTERN =
 export const PRIVATE_KEY_UNCOMPRESSED_PATTERN = 
   '^([0-9a-f]{64})$';
 
+// nosign:addr
+export const PRIVATE_KEY_NOSIGN_PATTERN = 
+  `^nosign:${ADDRESS_CHARS}$`;
+
 // m,pk1,pk2,...,pkn
 export const PRIVATE_KEY_MULTISIG_PATTERN =
   '^([0-9]+),([0-9a-f]{64,66},)*([0-9a-f]{64,66})$';
@@ -42,7 +46,7 @@ export const PRIVATE_KEY_SEGWIT_P2SH_PATTERN =
 
 // any private key pattern we support 
 export const PRIVATE_KEY_PATTERN_ANY = 
-  `${PRIVATE_KEY_PATTERN}|${PRIVATE_KEY_MULTISIG_PATTERN}|${PRIVATE_KEY_SEGWIT_P2SH_PATTERN}`;
+  `${PRIVATE_KEY_PATTERN}|${PRIVATE_KEY_MULTISIG_PATTERN}|${PRIVATE_KEY_SEGWIT_P2SH_PATTERN}|${PRIVATE_KEY_NOSIGN_PATTERN}`;
 
 export const PUBLIC_KEY_PATTERN = 
   '^([0-9a-f]{66,130})$'
@@ -103,7 +107,7 @@ export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf'
 export const DEFAULT_MAX_ID_SEARCH_INDEX = 256
 
 // CLI usage
-const CLI_ARGS = {
+export const CLI_ARGS = {
   type: 'object',
   properties: {
     announce: {
@@ -278,6 +282,21 @@ const CLI_ARGS = {
       '    Enter password:\n' +
       '    section amount spend resemble spray verify night immune tattoo best emotion parrot',
       group: "Key Management",
+    },
+    docs: {
+      type: "array",
+      items: [
+        {
+          name: "format",
+          type: "string",
+          realtype: "output_format",
+          pattern: "^json$"
+        }
+      ],
+      minItems: 0,
+      maxItems: 1,
+      help: "Dump the documentation for all commands as JSON to standard out.",
+      group: "CLI"
     },
     encrypt_keychain: {
       type: "array",
