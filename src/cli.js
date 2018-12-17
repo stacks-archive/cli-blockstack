@@ -33,6 +33,7 @@ import {
 } from './keys';
 
 import {
+  CLI_ARGS,
   getCLIOpts,
   printUsage,
   checkArgs,
@@ -45,7 +46,8 @@ import {
   DEFAULT_CONFIG_TESTNET_PATH,
   ADDRESS_PATTERN,
   ID_ADDRESS_PATTERN,
-  STACKS_ADDRESS_PATTERN
+  STACKS_ADDRESS_PATTERN,
+  DEFAULT_MAX_ID_SEARCH_INDEX
 } from './argparse';
 
 import {
@@ -63,7 +65,8 @@ import {
   gaiaConnect,
   gaiaUploadProfileAll,
   makeZoneFileFromGaiaUrl,
-  makeAssociationToken
+  makeAssociationToken,
+  getGaiaAddressFromProfile
 } from './data';
 
 import {
@@ -85,7 +88,8 @@ import {
   getBackupPhrase,
   mkdirs,
   getIDAddress,
-  getIDAppKeys
+  getIDAppKeys,
+  hasKeys
 } from './utils';
 
 import {
@@ -100,8 +104,13 @@ let safetyChecks = true;
 let receiveFeesPeriod = 52595;
 let gracePeriod = 5000;
 let noExit = false;
+let maxIDSearchIndex = DEFAULT_MAX_ID_SEARCH_INDEX;
 
 let BLOCKSTACK_TEST = process.env.BLOCKSTACK_TEST ? true : false;
+
+export function getMaxIDSearchIndex() {
+  return maxIDSearchIndex;
+}
 
 /*
  * Get a name's record information
@@ -236,7 +245,7 @@ function getNameHistoryRecord(network: Object, args: Array<string>) {
   const name = args[0];
   let page;
 
-  if (args.length >= 2) {
+  if (args.length >= 2 && args[1] !== null && args[1] !== undefined) {
     page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getNameHistory(name, page);
@@ -324,7 +333,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
   const namespaceID = name.split('.').slice(-1)[0];
 
   const txPromise = blockstack.transactions.makePreorder(
-    name, address, paymentKey);
+    name, address, paymentKey, !hasKeys(paymentKey));
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
@@ -467,11 +476,11 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
   let zonefileHash = null;
   let zonefile = null;
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     zonefilePath = args[3];
   }
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     zonefileHash = args[4];
     zonefilePath = null;
 
@@ -499,7 +508,7 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
       });
 
   const txPromise = blockstack.transactions.makeRegister(
-    name, address, paymentKey, zonefile, zonefileHash);
+    name, address, paymentKey, zonefile, zonefileHash, !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -609,7 +618,7 @@ function makeZonefile(network: Object, args: Array<string>) {
     throw new Error("ID-address must start with ID-");
   }
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     resolver = args[3];
   }
 
@@ -659,9 +668,9 @@ function update(network: Object, args: Array<string>) {
   const paymentKey = decodePrivateKey(args[3]);
 
   let zonefile = null;
-  let zonefileHash = null;
+  let zonefileHash = '';
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     zonefileHash = args[4];
     zonefilePath = null;
     logger.debug(`Using zone file hash ${zonefileHash} instead of zone file`);
@@ -689,7 +698,7 @@ function update(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeUpdate(
-    name, ownerKey, paymentKey, zonefile, zonefileHash);
+    name, ownerKey, paymentKey, zonefile, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -793,7 +802,7 @@ function transfer(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeTransfer(
-    name, address, ownerKey, paymentKey, keepZoneFile);
+    name, address, ownerKey, paymentKey, keepZoneFile, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -885,7 +894,7 @@ function renew(network: Object, args: Array<string>) {
   let zonefileHash = null;
   let zonefile = null;
 
-  if (args.length >= 4) {
+  if (args.length >= 4 && !!args[3]) {
     // ID-address
     newAddress = args[3].slice(3);
   }
@@ -893,11 +902,11 @@ function renew(network: Object, args: Array<string>) {
     newAddress = getPrivateKeyAddress(network, ownerKey);
   }
 
-  if (args.length >= 5) {
+  if (args.length >= 5 && !!args[4]) {
     zonefilePath = args[4];
   }
 
-  if (args.length >= 6) {
+  if (args.length >= 6 && !!args[5]) {
     zonefileHash = args[5];
     zonefilePath = null;
     logger.debug(`Using zone file hash ${zonefileHash} instead of zone file`);
@@ -951,7 +960,7 @@ function renew(network: Object, args: Array<string>) {
 
   const txPromise = zonefilePromise.then((zonefileData) => {
     return blockstack.transactions.makeRenewal(
-      name, newAddress, ownerKey, paymentKey, zonefileData, zonefileHash);
+      name, newAddress, ownerKey, paymentKey, zonefileData, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
   });
 
   if (estimateOnly) {
@@ -1070,7 +1079,7 @@ function revoke(network: Object, args: Array<string>) {
     });
 
   const txPromise =  blockstack.transactions.makeRevoke(
-    name, ownerKey, paymentKey);
+    name, ownerKey, paymentKey, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -1149,7 +1158,7 @@ function namespacePreorder(network: Object, args: Array<string>) {
   const paymentAddress = getPrivateKeyAddress(network, paymentKey);
 
   const txPromise = blockstack.transactions.makeNamespacePreorder(
-    namespaceID, address, paymentKey);
+    namespaceID, address, paymentKey, !hasKeys(paymentKey));
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
@@ -1293,7 +1302,7 @@ function namespaceReveal(network: Object, args: Array<string>) {
       });
 
   const txPromise = blockstack.transactions.makeNamespaceReveal(
-    namespace, revealAddr, paymentKey);
+    namespace, revealAddr, paymentKey, !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise;
@@ -1371,7 +1380,7 @@ function namespaceReady(network: Object, args: Array<string>) {
   const revealAddress = getPrivateKeyAddress(network, revealKey);
 
   const txPromise = blockstack.transactions.makeNamespaceReady(
-    namespaceID, revealKey);
+    namespaceID, revealKey, !hasKeys(revealKey));
 
   const revealUTXOsPromise = network.getUTXOs(revealAddress);
 
@@ -1506,7 +1515,7 @@ function nameImport(network: Object, args: Array<string>) {
   const importAddress = getPrivateKeyAddress(network, importKey);
 
   const txPromise = blockstack.transactions.makeNameImport(
-    name, recipientAddr, zonefileHash, importKey);
+    name, recipientAddr, zonefileHash, importKey, !hasKeys(importKey));
 
   const importUTXOsPromise = network.getUTXOs(importAddress);
 
@@ -1612,7 +1621,7 @@ function announce(network: Object, args: Array<string>) {
   const senderAddress = getPrivateKeyAddress(network, senderKey);
 
   const txPromise = blockstack.transactions.makeAnnounce(
-    messageHash, senderKey);
+    messageHash, senderKey, !hasKeys(senderKey));
 
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
@@ -1701,7 +1710,7 @@ function register(network: Object, args: Array<string>) {
 
   let zonefilePromise = null;
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefilePromise = Promise.resolve().then(() => fs.readFileSync(zonefilePath).toString());
   }
@@ -1742,7 +1751,7 @@ function register(network: Object, args: Array<string>) {
 
     // will have only gotten back the raw tx (which we'll discard anyway,
     // since we have to use the right UTXOs)
-    return blockstack.transactions.makePreorder(name, address, paymentKey);
+    return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
   })
   .then((rawTx) => {
     preorderTx = rawTx;
@@ -1756,7 +1765,7 @@ function register(network: Object, args: Array<string>) {
   })
   .then(() => {
     // now we can make the NAME_REGISTRATION 
-    return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile);
+    return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
   })
   .then((rawTx) => {
     registerTx = rawTx;
@@ -1832,7 +1841,7 @@ function registerAddr(network: Object, args: Array<string>) {
   const mainnetAddress = network.coerceMainnetAddress(address)
 
   let zonefile = "";
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefile = fs.readFileSync(zonefilePath).toString();
   }
@@ -1881,7 +1890,7 @@ function registerAddr(network: Object, args: Array<string>) {
 
       // will have only gotten back the raw tx (which we'll discard anyway,
       // since we have to use the right UTXOs)
-      return blockstack.transactions.makePreorder(name, address, paymentKey);
+      return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
     })
     .then((rawTx) => {
       preorderTx = rawTx;
@@ -1895,7 +1904,7 @@ function registerAddr(network: Object, args: Array<string>) {
     })
     .then(() => {
       // now we can make the NAME_REGISTRATION 
-      return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile);
+      return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
     })
     .then((rawTx) => {
       registerTx = rawTx;
@@ -1966,7 +1975,7 @@ function registerSubdomain(network: Object, args: Array<string>) {
   logger.warn(`WARNING: not yet able to verify that ${registrarUrl} is the registrar ` +
               `for ${onChainName}; assuming that it is...`);
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefilePromise = Promise.resolve().then(() => fs.readFileSync(zonefilePath).toString());
   }
@@ -2242,7 +2251,7 @@ function getAppKeys(network: Object, args: Array<string>) {
 function getOwnerKeys(network: Object, args: Array<string>) {
   const mnemonicPromise = getBackupPhrase(args[0]);
   let maxIndex = 1;
-  if (args.length > 1) {
+  if (args.length > 1 && !!args[1]) {
     maxIndex = parseInt(args[1]);
   }
 
@@ -2364,7 +2373,7 @@ function balance(network: Object, args: Array<string>) {
 function getAccountHistory(network: Object, args: Array<string>) {
   const address = c32check.c32ToB58(args[0]);
 
-  if (args.length >= 2) {
+  if (args.length >= 2 && !!args[1]) {
     const page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getAccountHistoryPage(address, page);
@@ -2451,7 +2460,7 @@ function sendBTC(network: Object, args: Array<string>) {
     paymentKey = paymentKeyHex;
   }
 
-  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount)
+  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount, !hasKeys(paymentKey))
     .catch((e) => {
       if (e.name === 'InvalidAmountError') {
         return JSONStringify({
@@ -2494,7 +2503,7 @@ function sendTokens(network: Object, args: Array<string>) {
   const privateKey = decodePrivateKey(args[3]);
   let memo = "";
 
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     memo = args[4];
   }
 
@@ -2502,7 +2511,7 @@ function sendTokens(network: Object, args: Array<string>) {
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
   const txPromise = blockstack.transactions.makeTokenTransfer(
-    recipientAddress, tokenType, tokenAmount, memo, privateKey);
+    recipientAddress, tokenType, tokenAmount, memo, privateKey, !hasKeys(privateKey));
 
   const estimatePromise = senderUTXOsPromise.then((utxos) => {
     const numUTXOs = utxos.length;
@@ -2637,11 +2646,11 @@ function gaiaGetFile(network: Object, args: Array<string>) {
   let decrypt = false;
   let verify = false;
 
-  if (!!appPrivateKey && args.length > 4) {
+  if (!!appPrivateKey && args.length > 4 && !!args[4]) {
     decrypt = (args[4].toLowerCase() === 'true' || args[4].toLowerCase() === '1');
   }
 
-  if (!!appPrivateKey && args.length > 5) {
+  if (!!appPrivateKey && args.length > 5 && !!args[5]) {
     verify = (args[5].toLowerCase() === 'true' || args[5].toLowerCase() === '1');
   }
 
@@ -2687,10 +2696,10 @@ function gaiaPutFile(network: Object, args: Array<string>) {
   let encrypt = false;
   let sign = false;
   
-  if (args.length > 4) {
+  if (args.length > 4 && !!args[4]) {
     encrypt = (args[4].toLowerCase() === 'true' || args[4].toLowerCase() === '1');
   }
-  if (args.length > 5) {
+  if (args.length > 5 && !!args[5]) {
     sign = (args[5].toLowerCase() === 'true' || args[5].toLowerCase() === '1');
   }
   
@@ -2707,52 +2716,6 @@ function gaiaPutFile(network: Object, args: Array<string>) {
     });
 }
 
-/*
- * Go in a tail-recursion loop to apply a calback on a Gaia hub's files.
- */
-function gaiaListFilesLoop(hubConfig: Object, page: string | null, 
-                           count: number, fileCount: number, callback: (name: string) => boolean) {
-  if (count > 65536) {
-    // this is ridiculously huge 
-    throw new Error('Too many entries to list');
-  }
-
-  let httpStatus;
-  const pageRequest = JSON.stringify({ page: page });
-  return fetch(`${hubConfig.server}/list-files/${hubConfig.address}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': `${pageRequest.length}`,
-        'Authorization': `bearer ${hubConfig.token}`,
-      },
-      body: pageRequest
-    })
-    .then((response) => {
-      httpStatus = response.status;
-      return response.text();
-    })
-    .then((responseText) => JSON.parse(responseText))
-    .then((responseJSON) => {
-      const entries = responseJSON.entries;
-      const nextPage = responseJSON.page;
-      if (entries === null || entries === undefined) {
-        throw new Error('Malformed response: no entries');
-      }
-      for (let i = 0; i < entries.length; i++) {
-        callback(entries[i]);
-      }
-      if (nextPage && entries.length > 0) {
-        // keep going 
-        return gaiaListFilesLoop(hubConfig, nextPage, count+1,
-            fileCount + entries.length, callback);
-      }
-      else {
-        return Promise.resolve(JSONStringify(fileCount + entries.length));
-      }
-    });
-}
 
 /*
  * List files in a Gaia hub
@@ -2766,9 +2729,9 @@ function gaiaListFiles(network: Object, args: Array<string>) {
 
   // force mainnet addresses 
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
-  return blockstack.connectToGaiaHub(hubUrl, canonicalPrivateKey(appPrivateKey))
-    .then((hubConfig) => {
-      return gaiaListFilesLoop(hubConfig, null, 0, 0, (name) => {
+  return gaiaAuth(canonicalPrivateKey(appPrivateKey), hubUrl)
+    .then((userData) => {
+      return blockstack.listFiles((name) => {
         console.log(name);
         return true;
       });
@@ -2871,11 +2834,14 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
       mnemonic = keyInfo.mnemonic;
       appPrivateKey = keyInfo.appPrivateKey;
       ownerPrivateKey = keyInfo.ownerPrivateKey;
-      return gaiaConnect(network, hubUrl, appPrivateKey, ownerPrivateKey)
+      return gaiaAuth(appPrivateKey, hubUrl, ownerPrivateKey);
+    })
+    .then((userData) => {
+      return gaiaConnect(network, hubUrl, appPrivateKey);
     })
     .then((hubConfig) => {
       gaiaHubConfig = hubConfig;
-      return gaiaListFilesLoop(hubConfig, null, 0, 0, (name) => {
+      return blockstack.listFiles((name) => {
         fileNames.push(name);
         return true;
       });
@@ -3000,6 +2966,10 @@ function gaiaSetHub(network: Object, args: Array<string>) {
         throw new Error('No zone file found');
       }
 
+      if (!nameProfile.apps) {
+        nameProfile.apps = {};
+      }
+
       // get owner ID-address
       const ownerAddress = network.coerceMainnetAddress(nameInfo.address);
       const idAddress = `ID-${ownerAddress}`;
@@ -3007,10 +2977,25 @@ function gaiaSetHub(network: Object, args: Array<string>) {
       // get owner and app key info 
       const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
       const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, appKeyInfo.ownerKeyIndex);
+
+      // do we already have an address set for this app?
+      let existingAppAddress;
+      let appPrivateKey;
+      try {
+        existingAppAddress = getGaiaAddressFromProfile(network, nameProfile, appOrigin);
+        appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
+      }
+      catch (e) {
+        console.log(`No profile application entry for ${appOrigin}`);
+        appPrivateKey = extractAppKey(network, appKeyInfo);
+      }
      
-      let appPrivateKey = extractAppKey(appKeyInfo);
       appPrivateKey = `${canonicalPrivateKey(appPrivateKey)}01`;
       appAddress = network.coerceMainnetAddress(getPrivateKeyAddress(network, appPrivateKey));
+
+      if (existingAppAddress && appAddress !== existingAppAddress) {
+        throw new Error(`BUG: ${existingAppAddress} !== ${appAddress}`);
+      }
 
       profile = nameProfile;
       ownerPrivateKey = ownerKeyInfo.privateKey;
@@ -3062,6 +3047,9 @@ function addressConvert(network: Object, args: Array<string>) {
   let version;
   let b58addr;
   let c32addr;
+  let testnetb58addr;
+  let testnetc32addr;
+
   if (addr.match(STACKS_ADDRESS_PATTERN)) {
     c32addr = addr;
     b58addr = c32check.c32ToB58(c32addr);
@@ -3074,7 +3062,29 @@ function addressConvert(network: Object, args: Array<string>) {
     throw new Error(`Unrecognized address ${addr}`);
   }
 
-  return Promise.resolve().then(() => JSONStringify({STACKS: c32addr, BTC: b58addr}));
+  if (network.isTestnet()) {
+    testnetb58addr = network.coerceAddress(b58addr);
+    testnetc32addr = c32check.b58ToC32(testnetb58addr);
+  }
+
+  return Promise.resolve().then(() => {
+    let result = {
+      mainnet: {
+        STACKS: c32addr, 
+        BTC: b58addr
+      },
+      testnet: undefined
+    };
+
+    if (network.isTestnet()) {
+      result.testnet = {
+        STACKS: testnetc32addr, 
+        BTC: testnetb58addr
+      };
+    }
+
+    return JSONStringify(result)
+  })
 }
 
 /*
@@ -3093,11 +3103,11 @@ function authDaemon(network: Object, args: Array<string>) {
   let port = 8888;  // default port
   let profileGaiaHub = gaiaHubUrl;
 
-  if (args.length > 2) {
+  if (args.length > 2 && !!args[2]) {
     profileGaiaHub = args[2];
   }
 
-  if (args.length > 3) {
+  if (args.length > 3 && !!args[3]) {
     port = parseInt(args[3]);
   }
 
@@ -3145,7 +3155,7 @@ function encryptMnemonic(network: Object, args: Array<string>) {
 
   const passwordPromise = new Promise((resolve, reject) => {
     let pass = '';
-    if (args.length === 2) {
+    if (args.length === 2 && !!args[1]) {
       pass = args[1];
       resolve(pass);
     }
@@ -3189,7 +3199,7 @@ function decryptMnemonic(network: Object, args: Array<string>) {
   const ciphertext = args[0];
  
   const passwordPromise = new Promise((resolve, reject) => {
-    if (args.length === 2) {
+    if (args.length === 2 && !!args[1]) {
       const pass = args[1];
       resolve(pass);
     }
@@ -3215,6 +3225,39 @@ function decryptMnemonic(network: Object, args: Array<string>) {
     });
 }
 
+/* Print out all documentation on usage in JSON 
+ */
+function printDocs(network: Object, args: Array<string>) {
+  return Promise.resolve().then(() => {
+    const formattedDocs = [];
+    const commandNames = Object.keys(CLI_ARGS.properties);
+    for (let i = 0; i < commandNames.length; i++) {
+      const commandName = commandNames[i];
+      const args = [];
+      const usage = CLI_ARGS.properties[commandName].help;
+      const group = CLI_ARGS.properties[commandName].group;
+
+      for (let j = 0; j < CLI_ARGS.properties[commandName].items.length; j++) {
+        const argItem = CLI_ARGS.properties[commandName].items[j];
+        args.push({
+          name: argItem.name,
+          type: argItem.type,
+          value: argItem.realtype,
+          format: argItem.pattern ? argItem.pattern : '.+'
+        });
+      }
+
+      formattedDocs.push({
+        command: commandName,
+        args: args,
+        usage: usage,
+        group: group
+      });
+    }
+    return JSONStringify(formattedDocs);
+  });
+}
+
 /*
  * Decrypt a backup phrase
  * args:
@@ -3228,6 +3271,7 @@ const COMMANDS = {
   'balance': balance,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
+  'docs': printDocs,
   'encrypt_keychain': encryptMnemonic,
   'gaia_dump_bucket': gaiaDumpBucket,
   'gaia_getfile': gaiaGetFile,
@@ -3283,7 +3327,6 @@ export function CLIMain() {
 
   const cmdArgs = checkArgs(opts._);
   if (!cmdArgs.success) {
-    console.error(cmdArgs.error);
     if (cmdArgs.usage) {
       if (cmdArgs.command) {
         console.log(makeCommandUsageString(cmdArgs.command));
@@ -3302,11 +3345,13 @@ export function CLIMain() {
     safetyChecks = !opts['U'];
     receiveFeesPeriod = opts['N'] ? parseInt(opts['N']) : receiveFeesPeriod;
     gracePeriod = opts['G'] ? parseInt(opts['G']) : gracePeriod;
+    maxIDSearchIndex = opts['M'] ? parseInt(opts['M']) : maxIDSearchIndex;
 
     const debug = opts['d']
     const consensusHash = opts['C'];
     const integration_test = opts['i'];
     const testnet = opts['t'];
+    const magicBytes = opts['m'];
     const apiUrl = opts['H'];
     const transactionBroadcasterUrl = opts['T'];
     const nodeAPIUrl = opts['I'];
@@ -3349,8 +3394,11 @@ export function CLIMain() {
     };
 
     // wrap command-line options
-    const blockstackNetwork = new CLINetworkAdapter(
-        getNetwork(configData, (!!BLOCKSTACK_TEST || !!integration_test || !!testnet)), cliOpts);
+    const wrappedNetwork = getNetwork(configData, (!!BLOCKSTACK_TEST || !!integration_test || !!testnet));
+    const blockstackNetwork = new CLINetworkAdapter(wrappedNetwork, cliOpts);
+    if (magicBytes) {
+      blockstackNetwork.MAGIC_BYTES = magicBytes;
+    }
 
     blockstack.config.network = blockstackNetwork;
     blockstack.config.logLevel = 'error';

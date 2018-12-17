@@ -32,6 +32,10 @@ export const PRIVATE_KEY_PATTERN =
 export const PRIVATE_KEY_UNCOMPRESSED_PATTERN = 
   '^([0-9a-f]{64})$';
 
+// nosign:addr
+export const PRIVATE_KEY_NOSIGN_PATTERN = 
+  `^nosign:${ADDRESS_CHARS}$`;
+
 // m,pk1,pk2,...,pkn
 export const PRIVATE_KEY_MULTISIG_PATTERN =
   '^([0-9]+),([0-9a-f]{64,66},)*([0-9a-f]{64,66})$';
@@ -42,7 +46,7 @@ export const PRIVATE_KEY_SEGWIT_P2SH_PATTERN =
 
 // any private key pattern we support 
 export const PRIVATE_KEY_PATTERN_ANY = 
-  `${PRIVATE_KEY_PATTERN}|${PRIVATE_KEY_MULTISIG_PATTERN}|${PRIVATE_KEY_SEGWIT_P2SH_PATTERN}`;
+  `${PRIVATE_KEY_PATTERN}|${PRIVATE_KEY_MULTISIG_PATTERN}|${PRIVATE_KEY_SEGWIT_P2SH_PATTERN}|${PRIVATE_KEY_NOSIGN_PATTERN}`;
 
 export const PUBLIC_KEY_PATTERN = 
   '^([0-9a-f]{66,130})$'
@@ -100,8 +104,10 @@ export const DEFAULT_CONFIG_PATH = '~/.blockstack-cli.conf'
 export const DEFAULT_CONFIG_REGTEST_PATH = '~/.blockstack-cli-regtest.conf'
 export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf'
 
+export const DEFAULT_MAX_ID_SEARCH_INDEX = 256
+
 // CLI usage
-const CLI_ARGS = {
+export const CLI_ARGS = {
   type: 'object',
   properties: {
     announce: {
@@ -159,7 +165,7 @@ const CLI_ARGS = {
           pattern: '.+',
         },
         {
-          name: 'profileGaiaHub',
+          name: 'profile_gaia_hub',
           type: 'string',
           realtype: 'url',
           pattern: URL_PATTERN,
@@ -276,6 +282,21 @@ const CLI_ARGS = {
       '    Enter password:\n' +
       '    section amount spend resemble spray verify night immune tattoo best emotion parrot',
       group: "Key Management",
+    },
+    docs: {
+      type: "array",
+      items: [
+        {
+          name: "format",
+          type: "string",
+          realtype: "output_format",
+          pattern: "^json$"
+        }
+      ],
+      minItems: 0,
+      maxItems: 1,
+      help: "Dump the documentation for all commands as JSON to standard out.",
+      group: "CLI"
     },
     encrypt_keychain: {
       type: "array",
@@ -813,9 +834,15 @@ const CLI_ARGS = {
           realtype: 'blockstack_id',
           pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
         },
+        {
+          name: 'page',
+          type: 'string',
+          realtype: 'page_number',
+          pattern: '^[0-9]+$',
+        }
       ],
       minItems: 1,
-      maxItems: 1,
+      maxItems: 2,
       help: 'Get the low-level blockchain-hosted history of operations on a Blocktack ID.  ' +
       'This command is used mainly for debugging and diagnostics, and is not guaranteed to ' +
       'be stable across releases.',
@@ -1006,7 +1033,15 @@ const CLI_ARGS = {
       ],
       minItems: 1,
       maxItems: 1,
-      help: 'Get a zone file by hash',
+      help: 'Get a zone file by hash.\n' +
+      '\n' +
+      'Example:\n' +
+      '\n' +
+      '    $ blockstack-cli get_zonefile ee77ad484b7b229f09461e4c2b6d3bd3e152ba95\n' +
+      '    $ORIGIN ryanshea.id\n' +
+      '    $TTL 3600\n' +
+      '    _http._tcp URI 10 1 "https://gaia.blockstack.org/hub/15BcxePn59Y6mYD2fRLCLCaaHScefqW2No/1/profile.json"\n' +
+      '\n',
       group: 'Peer Services',
     },
     help: {
@@ -2214,6 +2249,8 @@ Options can be:
     -e                  Estimate the BTC cost of an transaction (in satoshis).
                         Do not generate or send any transactions.
 
+    -m MAGIC_BYTES      Use an alternative magic byte string instead of "id".
+
     -t                  Use the public testnet instead of mainnet.
 
     -i                  Use integration test framework instead of mainnet.
@@ -2241,6 +2278,9 @@ Options can be:
     -H URL              Use an alternative Blockstack Core API endpoint.
 
     -I URL              Use an alternative Blockstack Core Indexer endpoint.
+
+    -M MAX_INDEX        Maximum keychain index to use when searching for an identity address
+                        (default is ${DEFAULT_MAX_ID_SEARCH_INDEX}).
 
     -N PAY2NS_PERIOD    Number of blocks in which a namespace receives the registration
                         and renewal fees after it is created (DANGEROUS)
@@ -2427,10 +2467,13 @@ export function makeAllCommandsHelp(): string {
 /*
  * Make a usage string for a single command
  */
-export function makeCommandUsageString(command: string) : string {
+export function makeCommandUsageString(command: ?string) : string {
   let res = "";
   if (command === 'all') {
     return makeAllCommandsHelp();
+  }
+  if (!command) {
+    return makeAllCommandsList();
   }
 
   const commandInfo = CLI_ARGS.properties[command];
@@ -2504,7 +2547,7 @@ export function printUsage() {
  * The key _ is mapped to the non-opts list.
  */
 export function getCLIOpts(argv: Array<string>, 
-                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:') : Object {
+                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : Object {
   let optsTable = {};
   let remainingArgv = [];
   let argvBuff = argv.slice(0);
@@ -2577,7 +2620,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
   // scan for keywords 
   for (let i = 0; i < argsList.length; i++) {
     if (argsList[i].startsWith('--')) {
-      // positional argument 
+      // keyword argument 
       const argName = argsList[i].slice(2);
       let argValue = null;
 
@@ -2608,7 +2651,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
       }
 
       if (argValue) {
-        // found something!
+        // found an argument given as a keyword
         i += 1;
         foundArgs[argName] = argValue;
       }
@@ -2631,24 +2674,24 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
   let orderedArgIndex = 0;
 
   for (let i = 0; i < commandProps.length; i++) {
-    if (!commandProps[i].hasOwnProperty('name')) {
-      // positional argument
-      if (orderedArgIndex >= orderedArgs.length) {
-        break;
+    if (orderedArgIndex < orderedArgs.length) {
+      if (!commandProps[i].hasOwnProperty('name')) {
+        // unnamed positional argument 
+        mergedArgs.push(orderedArgs[orderedArgIndex]);
+        orderedArgIndex += 1;
       }
-      mergedArgs.push(orderedArgs[orderedArgIndex]);
-      orderedArgIndex += 1;
-    }
-    else if (!foundArgs.hasOwnProperty(commandProps[i].name)) {
-      // positional argument 
-      if (orderedArgIndex >= orderedArgs.length) {
-        break;
+      else if (!foundArgs.hasOwnProperty(commandProps[i].name)) {
+        // named positional argument, NOT given as a keyword
+        mergedArgs.push(orderedArgs[orderedArgIndex]);
+        orderedArgIndex += 1;
       }
-      mergedArgs.push(orderedArgs[orderedArgIndex]);
-      orderedArgIndex += 1;
+      else {
+        // keyword argument
+        mergedArgs.push(foundArgs[commandProps[i].name]);
+      }
     }
     else {
-      // keyword argument 
+      // keyword argument (possibly undefined)
       mergedArgs.push(foundArgs[commandProps[i].name]);
     }
   }
@@ -2665,7 +2708,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
 type checkArgsSuccessType = {
   'success': true,
   'command': string,
-  'args': Array<string>
+  'args': Array<?string>
 };
 
 type checkArgsFailType = {
@@ -2710,11 +2753,23 @@ export function checkArgs(argList: Array<string>)
 
   const commandArgs = parsedCommandArgs.arguments;
 
-  const commands = new Object();
-  commands[commandName] = commandArgs;
+  // validate all required commands as given.
+  // if there are optional commands, then only validate
+  // them if they're given.
+  const commandSchema = JSON.parse(JSON.stringify(CLI_ARGS.properties[commandName]));
+  for (let i = commandSchema.minItems; i < commandSchema.maxItems; i++) {
+    if (i < commandArgs.length) {
+      if (commandArgs[i] === null || commandArgs[i] === undefined) {
+        // optional argument not given.  Update the schema we're checking against
+        // to expect this.
+        commandArgs[i] = null;
+        commandSchema.items[i] = { type: "null" };
+      }
+    }
+  }
 
   const ajv = Ajv();
-  const valid = ajv.validate(CLI_ARGS, commands);
+  const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
      // console.error(ajv.errors);
      return {

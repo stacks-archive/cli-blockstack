@@ -11,7 +11,8 @@ import logger from 'winston'
 import {
   gaiaConnect,
   gaiaUploadProfileAll,
-  makeAssociationToken
+  makeAssociationToken,
+  getGaiaAddressFromProfile
 } from './data';
 
 import {
@@ -24,7 +25,7 @@ import {
   nameLookup,
   makeProfileJWT,
   getPublicKeyFromPrivateKey,
-  canonicalPrivateKey
+  canonicalPrivateKey,
 } from './utils';
 
 import { 
@@ -41,6 +42,7 @@ export type NamedIdentityType = {
   idAddress: string,
   privateKey: string,
   index: number,
+  profile: Object,
   profileUrl: string
 };
 
@@ -57,7 +59,15 @@ function getAppPrivateKey(network: Object,
                           appOrigin: string
 ): string {
   const appKeyInfo = getApplicationKeyInfo(network, mnemonic, id.idAddress, appOrigin, id.index);
-  const appPrivateKey = extractAppKey(appKeyInfo);
+  let appPrivateKey;
+  try {
+    const existingAppAddress = getGaiaAddressFromProfile(network, id.profile, appOrigin);
+    appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
+  }
+  catch (e) {
+    appPrivateKey = extractAppKey(network, appKeyInfo);
+  }
+
   return appPrivateKey;
 }
 
@@ -192,6 +202,7 @@ function loadNamedIdentitiesLoop(network: Object,
           idAddress: keyInfo.idAddress,
           privateKey: keyInfo.privateKey,
           index: index,
+          profile: {},
           profileUrl: ''
         });
       }
@@ -219,6 +230,7 @@ function loadUnnamedIdentity(network: Object, mnemonic: string, index: number): 
     idAddress: keyInfo.idAddress,
     privateKey: keyInfo.privateKey,
     index: index,
+    profile: {},
     profileUrl: ''
   };
   return idInfo;
@@ -251,7 +263,7 @@ function getIdentityInfo(network: Object, mnemonic: string, appGaiaHub: string, 
     .then((ids) => {
       const nameInfoPromises = [];
       for (let i = 0; i < ids.length; i++) {
-        const nameInfoPromise = nameLookup(network, ids[i].name, false)
+        const nameInfoPromise = nameLookup(network, ids[i].name, true)
           .catch(() => null);
 
         nameInfoPromises.push(nameInfoPromise);
@@ -271,6 +283,7 @@ function getIdentityInfo(network: Object, mnemonic: string, appGaiaHub: string, 
         }
         else {
           identities[i].profileUrl = nameDatas[i].profileUrl;
+          identities[i].profile = nameDatas[i].profile;
         }
       }
 

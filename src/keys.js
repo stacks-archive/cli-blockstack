@@ -7,6 +7,7 @@ const blockstack = require('blockstack')
 const keychains = require('blockstack-keychains')
 const bitcoin = require('bitcoinjs-lib')
 const bip39 = require('bip39')
+const bip32 = require('bip32')
 const crypto = require('crypto')
 const c32check = require('c32check')
 
@@ -14,232 +15,26 @@ import {
   getPrivateKeyAddress
 } from './utils';
 
-const IDENTITY_KEYCHAIN = 888
-const BLOCKSTACK_ON_BITCOIN = 0
-const APPS_NODE_INDEX = 0
-const SIGNING_NODE_INDEX = 1
-const ENCRYPTION_NODE_INDEX = 2
+import {
+  getMaxIDSearchIndex
+} from './cli';
+
+import type BIP32 from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
-
-class IdentityAddressOwnerNode {
-  hdNode: Object
-  salt: string
-
-  constructor(ownerHdNode: Object, salt: string) {
-    this.hdNode = ownerHdNode
-    this.salt = salt
-  }
-
-  getNode() {
-    return this.hdNode
-  }
-
-  getSalt() {
-    return this.salt
-  }
-
-  getIdentityKey() {
-    return toPrivkeyHex(this.hdNode)
-  }
-
-  getIdentityKeyID() {
-    return this.hdNode.publicKey.toString('hex')
-  }
-
-  getAppsNode() {
-    return new AppsNode(this.hdNode.deriveHardened(APPS_NODE_INDEX), this.salt)
-  }
-
-  getAddress() {
-    return getPrivateKeyAddress(blockstack.config.network, this.getIdentityKey())
-  }
-
-  getEncryptionNode() {
-    return this.hdNode.deriveHardened(ENCRYPTION_NODE_INDEX)
-  }
-
-  getSigningNode() {
-    return this.hdNode.deriveHardened(SIGNING_NODE_INDEX)
-  }
-}
-
-// for portal versions before 2038088458012dcff251027ea23a22afce443f3b
-class IdentityNode{
-  key : Object
-  constructor(key: Object) {
-    this.key = key;
-  }
-  getAddress() : string {
-    return getPrivateKeyAddress(blockstack.config.network, this.getSKHex())
-  }
-  getSKHex() : string {
-    return toPrivkeyHex(this.key)
-  }
-}
-
-const VERSIONS = {
-  "pre-v0.9" : (m, i) => { return getIdentityKeyPre09(m) },
-  "v0.9-v0.10" : (m, i) => { return getIdentityKey09to10(getMaster(m), i) },
-  "v0.10-current" : (m, i) => { return getIdentityKeyCurrent(getMaster(m), i) },
-  "current-btc" : (m, i) => { return getBTC(getMaster(m)) },
-}
-
-function getBTC(pK : Object) {
-  const BIP_44_PURPOSE = 44;
-  const BITCOIN_COIN_TYPE = 0;
-  const ACCOUNT_INDEX = 0;
-
-  return pK.deriveHardened(BIP_44_PURPOSE)
-     .deriveHardened(BITCOIN_COIN_TYPE)
-     .deriveHardened(ACCOUNT_INDEX).derive(0).derive(0);
-}
-
-function getIdentityNodeFromPhrase(phrase : string, 
-                                   index : number,
-                                   version : string = "current"){
-  if (! (version in VERSIONS)){
-    throw new Error(`Key derivation version '${version}' not uspported`);
-  }
-  return VERSIONS[version](phrase, index);
-}
-
-function getIdentityKeyCurrent(pK : Object, index : number = 0){
-  return new IdentityNode(
-    pK.deriveHardened(IDENTITY_KEYCHAIN)
-      .deriveHardened(BLOCKSTACK_ON_BITCOIN)
-      .deriveHardened(index));
-}
-
-function getIdentityKey09to10(pK : Object, index : number = 0){
-  return new IdentityNode(
-     pK.deriveHardened(IDENTITY_KEYCHAIN)
-       .deriveHardened(BLOCKSTACK_ON_BITCOIN)
-       .deriveHardened(index)
-       .derive(0));
-}
 
 function toPrivkeyHex(k : Object) : string {
   return `${k.privateKey.toString('hex')}01`;
 }
 
-function getIdentityKeyPre09(mnemonic : string) : IdentityNode {
-  // on browser branch, v09 was commit -- 848d1f5445f01db1e28cde4a52bb3f22e5ca014c
-  const pK = keychains.PrivateKeychain.fromMnemonic(mnemonic);
-  const identityKey = pK.privatelyNamedChild('blockstack-0');
-  const secret = identityKey.privateKey;
-  const keyPair = new bitcoin.ECPair(secret, false, {"network" :
-                                                    bitcoin.networks.bitcoin});
-  return new IdentityNode({ keyPair });
+function walletFromMnemonic(mnemonic: string): blockstack.BlockstackWallet {
+  const seed = bip39.mnemonicToSeed(mnemonic)
+  return new blockstack.BlockstackWallet(bip32.fromSeed(seed))
 }
 
-function getMaster(mnemonic : string) {
-  const seed = bip39.mnemonicToSeed(mnemonic);
-  return bitcoin.bip32.fromSeed(seed);
+function getNodePrivateKey(node: BIP32): string {
+  return blockstack.ecPairToHexString(bitcoin.ECPair.fromPrivateKey(node.privateKey))
 }
-
-
-// NOTE: legacy
-function hashCode(string) {
-  let hash = 0
-  if (string.length === 0) return hash
-  for (let i = 0; i < string.length; i++) {
-    const character = string.charCodeAt(i)
-    hash = (hash << 5) - hash + character
-    hash = hash & hash
-  }
-  return hash & 0x7fffffff
-}
-
-export class AppNode {
-  hdNode: Object
-  appDomain: string
-
-  constructor(hdNode: Object, appDomain: string) {
-    this.hdNode = hdNode
-    this.appDomain = appDomain
-  }
-
-  getAppPrivateKey() {
-    return toPrivkeyHex(this.hdNode)
-  }
-
-  getAddress() {
-    return getPrivateKeyAddress(blockstack.config.network, toPrivkeyHex(this.hdNode))
-  }
-}
-
-export class AppsNode {
-  hdNode: Object
-  salt: string
-
-  constructor(appsHdNode: Object, salt: string) {
-    this.hdNode = appsHdNode
-    this.salt = salt
-  }
-
-  getNode() {
-    return this.hdNode
-  }
-
-  getAppNode(appDomain: string) {
-    const hash = crypto
-      .createHash('sha256')
-      .update(`${appDomain}${this.salt}`)
-      .digest('hex')
-    const appIndex = hashCode(hash)
-    const appNode = this.hdNode.deriveHardened(appIndex)
-    return new AppNode(appNode, appDomain)
-  }
-
-  toBase58() {
-    return this.hdNode.toBase58()
-  }
-
-  getSalt() {
-    return this.salt
-  }
-}
-
-export function getIdentityPrivateKeychain(masterKeychain: Object) {
-  return masterKeychain.deriveHardened(IDENTITY_KEYCHAIN).deriveHardened(BLOCKSTACK_ON_BITCOIN)
-}
-
-export function getIdentityPublicKeychain(masterKeychain: Object) {
-  return getIdentityPrivateKeychain(masterKeychain).neutered()
-}
-
-export function getIdentityOwnerAddressNode(
-  identityPrivateKeychain: Object, identityIndex: ?number = 0) {
-  if (identityPrivateKeychain.isNeutered()) {
-    throw new Error('You need the private key to generate identity addresses')
-  }
-
-  // const publicKeyHex = identityPrivateKeychain.keyPair.getPublicKeyBuffer().toString('hex')
-  const publicKeyHex = identityPrivateKeychain.publicKey.toString('hex')
-  const salt = crypto
-    .createHash('sha256')
-    .update(publicKeyHex)
-    .digest('hex')
-
-  return new IdentityAddressOwnerNode(identityPrivateKeychain.deriveHardened(identityIndex), salt)
-}
-
-export function deriveIdentityKeyPair(identityOwnerAddressNode: Object) {
-  const address = identityOwnerAddressNode.getAddress()
-  const identityKey = identityOwnerAddressNode.getIdentityKey()
-  const identityKeyID = identityOwnerAddressNode.getIdentityKeyID()
-  const appsNode = identityOwnerAddressNode.getAppsNode()
-  const keyPair = {
-    key: identityKey,
-    keyID: identityKeyID,
-    address,
-    appsNodeKey: appsNode.toBase58(),
-    salt: appsNode.getSalt()
-  }
-  return keyPair
-}
-
 
 /*
  * Get the owner key information for a 12-word phrase, at a specific index.
@@ -257,9 +52,11 @@ export function getOwnerKeyInfo(network: Object,
                                 mnemonic : string, 
                                 index : number, 
                                 version : string = 'v0.10-current') {
-  const identity = getIdentityNodeFromPhrase(mnemonic, index, version);
-  const addr = network.coerceAddress(identity.getAddress());
-  const privkey = identity.getSKHex();
+
+  const wallet = walletFromMnemonic(mnemonic);
+  const identity = wallet.getIdentityAddressNode(index);
+  const addr = network.coerceAddress(blockstack.BlockstackWallet.getAddressFromBIP32Node(identity));
+  const privkey = getNodePrivateKey(identity);
   return {
     privateKey: privkey,
     version: version,
@@ -272,14 +69,14 @@ export function getOwnerKeyInfo(network: Object,
  * Get the payment key information for a 12-word phrase.
  * @network (object) the blockstack network
  * @mnemonic (string) the 12-word phrase
- * 
+ *
  * Returns an object with:
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
 export function getPaymentKeyInfo(network: Object, mnemonic : string) {
-  const identityHDNode = getIdentityNodeFromPhrase(mnemonic, 0, 'current-btc');
-  const privkey = toPrivkeyHex(identityHDNode);
+  const wallet = walletFromMnemonic(mnemonic);
+  const privkey = wallet.getBitcoinPrivateKey(0);
   const addr = getPrivateKeyAddress(network, privkey);
   return {
     privateKey: privkey,
@@ -296,18 +93,21 @@ export function getPaymentKeyInfo(network: Object, mnemonic : string) {
  * Returns the index if found
  * Returns -1 if not found
  */
-export function findIdentityIndex(network: Object, mnemonic: string, idAddress: string, maxIndex: ?number = 16) {
+export function findIdentityIndex(network: Object, mnemonic: string, idAddress: string, maxIndex: ?number) {
   if (!maxIndex) {
-    maxIndex = 16;
+    maxIndex = getMaxIDSearchIndex();
   }
 
   if (idAddress.substring(0,3) !== 'ID-') {
     throw new Error('Not an identity address');
   }
 
+  const wallet = walletFromMnemonic(mnemonic);
   for (let i = 0; i < maxIndex; i++) {
-    const identity = getIdentityNodeFromPhrase(mnemonic, i, 'v0.10-current');
-    if (network.coerceAddress(identity.getAddress()) ===
+    const identity = wallet.getIdentityAddressNode(i);
+    const addr = blockstack.BlockstackWallet.getAddressFromBIP32Node(identity);
+
+    if (network.coerceAddress(addr) ===
         network.coerceAddress(idAddress.slice(3))) {
       return i;
     }
@@ -347,29 +147,24 @@ export function getApplicationKeyInfo(network: Object,
     }
   }
 
-  const masterKeychain = getMaster(mnemonic);
-  const identityPrivateKeychainNode = getIdentityPrivateKeychain(masterKeychain);
-  const identityOwnerAddressNode = getIdentityOwnerAddressNode(
-    identityPrivateKeychainNode, idIndex);
+  const wallet = walletFromMnemonic(mnemonic);
+  const identityOwnerAddressNode = wallet.getIdentityAddressNode(idIndex);
+  const appsNode = blockstack.BlockstackWallet.getAppsNode(identityOwnerAddressNode);
 
-  // legacy app key (will update later to use the longer derivation path)
-  const identityInfo = deriveIdentityKeyPair(identityOwnerAddressNode);
-  const appsNodeKey = identityInfo.appsNodeKey;
-  const salt = identityInfo.salt;
-  const appsNode = new AppsNode(bitcoin.bip32.fromBase58(appsNodeKey), salt);
+  const appPrivateKey = blockstack.BlockstackWallet.getAppPrivateKey(
+    appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
+  const legacyAppPrivateKey = blockstack.BlockstackWallet.getLegacyAppPrivateKey(
+    appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
 
-  // NOTE: we don't include the 'compressed' flag for app private keys, even though
-  // the app address is the hash of the compressed public key.
-  const appPrivateKey = appsNode.getAppNode(appDomain).getAppPrivateKey().substring(0,64);
-
+  // TODO: figure out when we can start using the new derivation path
   const res = {
     keyInfo: {
-      privateKey: 'TODO',
-      address: 'TODO',
+      privateKey: 'TODO', // appPrivateKey,
+      address: 'TODO', // getPrivateKeyAddress(network, `${appPrivateKey}01`)
     },
     legacyKeyInfo: {
-      privateKey: appPrivateKey,
-      address: getPrivateKeyAddress(network, `${appPrivateKey}01`)
+      privateKey: legacyAppPrivateKey,
+      address: getPrivateKeyAddress(network, `${legacyAppPrivateKey}01`)
     },
     ownerKeyIndex: idIndex
   };
@@ -379,7 +174,20 @@ export function getApplicationKeyInfo(network: Object,
 /*
  * Extract the "right" app key
  */
-export function extractAppKey(appKeyInfo: { keyInfo: { privateKey: string }, legacyKeyInfo: { privateKey : string } }) {
+export function extractAppKey(
+  network: Object,
+  appKeyInfo: { keyInfo: { privateKey: string, address: string }, legacyKeyInfo: { privateKey : string, address: string } },
+  appAddress?: string
+) {
+  if (appAddress) {
+    if (network.coerceMainnetAddress(appKeyInfo.keyInfo.address) === network.coerceMainnetAddress(appAddress)) {
+      return appKeyInfo.keyInfo.privateKey;
+    }
+    if (network.coerceMainnetAddress(appKeyInfo.legacyKeyInfo.address) === network.coerceMainnetAddress(appAddress)) {
+      return appKeyInfo.legacyKeyInfo.privateKey;
+    }
+  }
+
   const appPrivateKey = (appKeyInfo.keyInfo.privateKey === 'TODO' || !appKeyInfo.keyInfo.privateKey ?
                          appKeyInfo.legacyKeyInfo.privateKey :
                          appKeyInfo.keyInfo.privateKey);
