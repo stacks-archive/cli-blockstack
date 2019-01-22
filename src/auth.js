@@ -32,7 +32,46 @@ import {
   type GaiaHubConfig
 } from 'blockstack';
 
-export const SIGNIN_HEADER = '<html><head></head></body><h2>Blockstack CLI Sign-in</h2><br>'
+export const SIGNIN_CSS = `
+h1 { 
+  font-family: monospace; 
+  font-size: 24px; 
+  font-style: normal; 
+  font-variant: normal; 
+  font-weight: 700; 
+  line-height: 26.4px; 
+} 
+h3 { 
+  font-family: monospace; 
+  font-size: 14px; 
+  font-style: normal; 
+  font-variant: normal; 
+  font-weight: 700; 
+  line-height: 15.4px; 
+}
+p { 
+  font-family: monospace; 
+  font-size: 14px; 
+  font-style: normal; 
+  font-variant: normal; 
+  font-weight: 400; 
+  line-height: 20px; 
+}
+b {
+  background-color: #e8e8e8;
+}
+pre { 
+  font-family: monospace; 
+  font-size: 13px; 
+  font-style: normal; 
+  font-variant: normal; 
+  font-weight: 400; 
+  line-height: 18.5714px;
+}`
+
+export const SIGNIN_HEADER = `<html><head><style>${SIGNIN_CSS}</style></head></body><h3>Blockstack CLI Sign-in</h3><br>`
+export const SIGNIN_DESC = '<p>Sign-in request for <b>"{appName}"</b></p>'
+export const SIGNIN_SCOPES = '<p>Requested scopes: <b>"{appScopes}"</b></p>'
 export const SIGNIN_FMT_NAME = '<p><a href="{authRedirect}">{blockstackID}</a> ({idAddress})</p>'
 export const SIGNIN_FMT_ID = '<p><a href="{authRedirect}">{idAddress}</a> (anonymous)</p>'
 export const SIGNIN_FOOTER = '</body></html>'
@@ -136,9 +175,19 @@ function makeAuthPage(network: Object,
                       hubUrl: string,
                       manifest: Object,
                       authRequest: Object,
-                      ids: Array<NamedIdentityType>) : string {
+                      ids: Array<NamedIdentityType>
+) : string {
 
-  let signinBody = SIGNIN_HEADER;
+  let signinBody = SIGNIN_HEADER
+  let signinDescription = SIGNIN_DESC
+    .replace(/{appName}/, manifest.name || "(Unknown app)");
+
+  let signinScopes = SIGNIN_SCOPES
+    .replace(/{appScopes}/, authRequest.scopes.length > 0
+                            ? authRequest.scopes.join(", ")
+                            : "(none)");
+
+  signinBody = `${signinBody}${signinDescription}${signinScopes}`
 
   for (let i = 0; i < ids.length; i++) {
     let signinEntry
@@ -383,16 +432,22 @@ export function handleAuth(network: Object,
 function updateProfileApps(network: Object, 
                           id: NamedIdentityType, 
                           appOrigin: string, 
-                          appGaiaConfig: GaiaHubConfig
+                          appGaiaConfig: GaiaHubConfig,
+                          profile: ?Object = undefined
 ): Promise<{ profile: Object, changed: boolean }> {
 
-  let profile;
   let needProfileUpdate = false;
 
   // go get the profile from the profile URL in the id
-  const profilePromise = nameLookup(network, id.name)
-    .catch((e) => null)
-      
+  const profilePromise = Promise.resolve().then(() => {
+    if (profile === null || profile === undefined) {
+      return nameLookup(network, id.name)
+        .catch((e) => null);
+    } else {
+      return { profile: profile };
+    }
+  });
+
   return profilePromise.then((profileData) => {
     if (profileData) {
       profile = profileData.profile;
@@ -400,6 +455,7 @@ function updateProfileApps(network: Object,
 
     if (!profile) {
       // instantiate 
+      logger.debug(`Profile for ${id.name} is ${JSON.stringify(profile)}`);
       logger.debug(`Instantiating profile for ${id.name}`);
       needProfileUpdate = true;
       profile = {
@@ -438,6 +494,76 @@ function updateProfileApps(network: Object,
   })
 }
 
+/*
+ * Updates a named identitie's profile's API settings, if necessary.
+ * Indicates whether or not the profile data changed.
+ */
+function updateProfileAPISettings(network: Object,
+                                  id: NamedIdentityType,
+                                  appGaiaConfig: GaiaHubConfig,
+                                  profile: ?Object = undefined
+): Promise<{ profile: Object, changed: boolean }> {
+
+  let needProfileUpdate = false;
+
+  // go get the profile from the profile URL in the id
+  const profilePromise = Promise.resolve().then(() => {
+    if (profile === null || profile === undefined) {
+      return nameLookup(network, id.name)
+        .catch((e) => null);
+    }
+    else {
+      return { profile: profile };
+    }
+  });
+      
+  return profilePromise.then((profileData) => {
+    if (profileData) {
+      profile = profileData.profile;
+    }
+
+    if (!profile) {
+      // instantiate
+      logger.debug(`Profile for ${id.name} is ${JSON.stringify(profile)}`);
+      logger.debug(`Instantiating profile for ${id.name}`);
+      needProfileUpdate = true;
+      profile = {
+        'type': '@Person',
+        'account': [],
+        'api': {},
+      };
+    }
+
+    // do we need to update the API settings in the profile?
+    if (profile.api === null || profile.api === undefined) {
+      needProfileUpdate = true;
+
+      logger.debug(`Adding API settings to profile for ${id.name}`);
+      profile.api = {
+        gaiaHubConfig: {
+          url_prefix: appGaiaConfig.url_prefix
+        },
+        gaiaHubUrl: appGaiaConfig.server
+      };
+    }
+
+    if (!profile.hasOwnProperty('api') || !profile.api.hasOwnProperty('gaiaHubConfig') ||
+        !profile.api.gaiaHubConfig.hasOwnProperty('url_prefix') || !profile.api.gaiaHubConfig.url_prefix ||
+        !profile.api.hasOwnProperty('gaiaHubUrl') || !profile.api.gaiaHubUrl) {
+
+      logger.debug(`Existing profile for ${id.name} is ${JSON.stringify(profile)}`);
+      logger.debug(`Updating API settings to profile for ${id.name}`);
+      profile.api = {
+        gaiaHubConfig: {
+          url_prefix: appGaiaConfig.url_prefix
+        },
+        gaiaHubUrl: appGaiaConfig.server
+      };
+    }
+
+    return { profile, changed: needProfileUpdate };
+  })
+}
 
 /*
  * Handle GET /signin?encAuthResponse=...
@@ -478,6 +604,9 @@ export function handleSignIn(network: Object,
   let redirectUri;
   let scopes;
   let authResponse;
+  let hubConfig;
+  let needProfileAPIUpdate = false;
+  let profileAPIUpdate;
 
   return Promise.resolve().then(() => {
     // verify and decrypt 
@@ -526,17 +655,32 @@ export function handleSignIn(network: Object,
     return gaiaConnect(network, appGaiaHub, appPrivateKey);
   })
   .then((appHubConfig) => {
-    return updateProfileApps(network, id, appOrigin, appHubConfig);
+    hubConfig = appHubConfig;
+    return updateProfileAPISettings(network, id, hubConfig);
+  })
+  .then((newProfileData) => {
+    needProfileAPIUpdate = newProfileData.changed;
+    profileAPIUpdate = newProfileData.profile;
+    return updateProfileApps(network, id, appOrigin, hubConfig, profileAPIUpdate);
   })
   .then((newProfileData) => {
     const profile = newProfileData.profile;
-    const needProfileUpdate = newProfileData.changed && scopes.includes('store_write');
+    const needProfileSigninUpdate = newProfileData.changed && scopes.includes('store_write');
+
+    logger.debug(`Resulting profile for ${id.name} is ${JSON.stringify(profile)}`);
 
     // sign and replicate new profile if we need to.
     // otherwise do nothing 
-    if (needProfileUpdate) {
-      logger.debug(`Upload new profile to ${profileGaiaHub}`);
+    if (needProfileSigninUpdate) {
+      logger.debug(`Upload new profile with new sign-in data to ${profileGaiaHub}`);
       const profileJWT = makeProfileJWT(profile, id.privateKey);
+      return gaiaUploadProfileAll(
+        network, [profileGaiaHub], profileJWT, id.privateKey, id.name);
+    }
+    else if (needProfileAPIUpdate) {
+      // API settings changed, but we won't be adding an app entry
+      logger.debug(`Upload new profile with new API settings to ${profileGaiaHub}`);
+      const profileJWT = makeProfileJWT(profileAPIUpdate, id.privateKey);
       return gaiaUploadProfileAll(
         network, [profileGaiaHub], profileJWT, id.privateKey, id.name);
     }
@@ -554,6 +698,7 @@ export function handleSignIn(network: Object,
 
     // success!
     // redirect to application
+    logger.debug(`Handled sign-in to ${appOrigin} using ${id.name}`);
     const appUri = blockstack.updateQueryStringParameter(redirectUri, 'authResponse', authResponse); 
     res.writeHead(302, {'Location': appUri});
     res.end();
