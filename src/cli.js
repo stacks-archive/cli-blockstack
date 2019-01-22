@@ -3375,8 +3375,11 @@ export function CLIMain() {
     if (debug) {
       configData.logConfig.level = 'debug';
     }
+    else {
+      configData.logConfig = { level: 'info' };
+    }
 
-    winston.configure({ transports: [new winston.transports.Console(configData.logConfig)] })
+    winston.configure({ level: configData.logConfig.level, transports: [new winston.transports.Console(configData.logConfig)] })
      
     const cliOpts = {
       consensusHash,
