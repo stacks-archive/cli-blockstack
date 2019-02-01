@@ -2,6 +2,7 @@
 .*/node_modules/documentation/*
 .*/node_modules/.staging/*
 .*/blockstack.js/*
+.*/node_modules/module-deps/test/invalid_pkg*
 
 [include]
 ../blockstack.js
