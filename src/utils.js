@@ -194,11 +194,8 @@ export function hasKeys(signer: String | TransactionSigner) : bool {
   if (typeof signer === 'string') {
     return true;
   }
-  else if (signer instanceof TransactionSigner) {
-    return signer.isComplete;
-  }
   else {
-    return false;
+    return (signer.isComplete ? true : false);
   }
 }
 
