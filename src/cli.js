@@ -8,6 +8,7 @@ import winston from 'winston'
 import logger from 'winston'
 import expressWinston from 'express-winston'
 import cors from 'cors'
+import RIPEMD160 from 'ripemd160'
 
 const bigi = require('bigi')
 const URL = require('url')
@@ -236,6 +237,33 @@ function getNameBlockchainRecord(network: Object, args: Array<string>) {
 }
 
 /*
+ * Get all of a name's history
+ */
+
+function getAllNameHistoryPages(network: Object, name: string, page: number) {
+  return new Promise((resolve, reject) => {
+    let history = {};
+    return network.getNameHistory(name, page)
+      .then((results) => {
+        if (Object.keys(results).length == 0) {
+          resolve(history);
+        }
+        else {
+          history = Object.assign(history, results);
+          getAllNameHistoryPages(network, name, page + 1)
+            .then((rest) => {
+              history = Object.assign(history, rest);
+              resolve(history);
+            })
+        }
+      })
+      .catch((e) => {
+        resolve(history);
+      });
+  });
+}
+
+/*
  * Get a name's history entry or entries
  * args:
  * @name (string) the name to query
@@ -256,25 +284,8 @@ function getNameHistoryRecord(network: Object, args: Array<string>) {
   }
   else {
     // all pages 
-    let history = {};
-    
-    function getAllHistoryPages(page: number) {
-      return network.getNameHistory(name, page)
-        .then((results) => {
-          if (Object.keys(results).length == 0) {
-            return JSONStringify(history);
-          }
-          else {
-            history = Object.assign(history, results);
-            return getAllHistoryPages(page + 1);
-          }
-        })
-        .catch((e) => {
-          return JSONStringify(history);
-        })
-    }
-
-    return getAllHistoryPages(0);
+    return getAllNameHistoryPages(network, name, 0)
+      .then((history) => JSONStringify(history));
   }
 }
 
@@ -872,6 +883,37 @@ function transfer(network: Object, args: Array<string>) {
 }
 
 /*
+ * Get the last zone file hash
+ */
+function getLastZonefileHash(network: Object, name: string): Promise<string> {
+  return getAllNameHistoryPages(network, name, 0)
+    .then((nameHistory) => {
+      let zfh = null;
+      const blockHeights = Object.keys(nameHistory).sort().reverse();
+      for (let i = 0; i < blockHeights.length; i++) {
+        const blockHeight = blockHeights[i];
+        for (let j = nameHistory[blockHeight].length - 1; j >= 0; j--) {
+          const entry = nameHistory[blockHeight][j];
+          if (!!entry.value_hash) {
+            zfh = entry.value_hash;
+            break;
+          }
+        }
+        if (!!zfh) {
+          break;
+        }
+      }
+      
+      if (!!zfh) {
+        return zfh;
+      }
+      else {
+        throw new Error(`Failed to find a zone file hash for ${name}`);
+      }
+    })
+}
+
+/*
  * Generate and optionally send a name-renewal
  * args:
  * @name (string) the name to renew
@@ -931,36 +973,27 @@ function renew(network: Object, args: Array<string>) {
           numOwnerUTXOs + numPaymentUTXOs - 1);
       });
 
-  const zonefilePromise = new Promise((resolve, reject) => {
+  const zonefileHashPromise = new Promise((resolve, reject) => {
     if (!!zonefile) {
-      resolve(zonefile);
+      const sha256 = bitcoin.crypto.sha256(zonefile)
+      const h = (new RIPEMD160()).update(sha256).digest('hex')
+      resolve(h);
     } else if (!!zonefileHash) {
       // already have the hash 
-      resolve(null);
+      resolve(zonefileHash);
     } else {
-      return network.getNameInfo(name)
-        .then((nameInfo) => {
-          if (!!nameInfo.zonefile_hash) {
-            return network.getZonefile(nameInfo.zonefile_hash)
-              .then((zonefileData) => {
-                resolve(zonefileData);
-              })
-              .catch((zonefileNetworkError) => reject(zonefileNetworkError));
-          } else {
-            // give an empty zonefile 
-            resolve(null);
-          };
-        })
-        .catch((nameNetworkError) => reject(nameNetworkError));
+      return getLastZonefileHash(network, name)
+        .then(zfh => resolve(zfh))
+        .catch(e => reject(e));
     }
   })
   .catch((e) => {
     console.error(e);
   });
 
-  const txPromise = zonefilePromise.then((zonefileData) => {
+  const txPromise = zonefileHashPromise.then((zfh) => {
     return blockstack.transactions.makeRenewal(
-      name, newAddress, ownerKey, paymentKey, zonefileData, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
+      name, newAddress, ownerKey, paymentKey, zonefile, zfh, !hasKeys(ownerKey) || !hasKeys(paymentKey));
   });
 
   if (estimateOnly) {
@@ -2389,7 +2422,7 @@ function getAccountHistory(network: Object, args: Array<string>) {
     // all pages 
     let history = [];
     
-    function getAllHistoryPages(page: number) {
+    function getAllAccountHistoryPages(page: number) {
       return network.getAccountHistoryPage(address, page)
         .then((results) => {
           if (Object.keys(results).length == 0) {
@@ -2397,12 +2430,12 @@ function getAccountHistory(network: Object, args: Array<string>) {
           }
           else {
             history = history.concat(results);
-            return getAllHistoryPages(page + 1);
+            return getAllAccountHistoryPages(page + 1);
           }
         })
     }
 
-    return getAllHistoryPages(0)
+    return getAllAccountHistoryPages(0)
       .then(accountStates => JSONStringify(accountStates.map((s) => {
         s.address = c32check.b58ToC32(s.address);
         s.credit_value = s.credit_value.toString();
