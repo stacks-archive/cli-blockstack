@@ -1705,7 +1705,7 @@ export const CLI_ARGS = {
         }
       ],
       minItems: 4,
-      maxItems: 4,
+      maxItems: 5,
       help: 'If you are trying to register a name for an *ID-address*, use this command.\n' +
       '\n' +
       'Register a name to someone\'s ID-address.  After successfully running this ' +
