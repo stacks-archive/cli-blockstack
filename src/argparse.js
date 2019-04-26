@@ -66,7 +66,7 @@ export const TXID_PATTERN =
 export const BOOLEAN_PATTERN = '^(0|1|true|false)$'
 
 const LOG_CONFIG_DEFAULTS = {
-  level: 'warn',
+  level: 'info',
   handleExceptions: true,
   timestamp: true,
   stringify: true,
