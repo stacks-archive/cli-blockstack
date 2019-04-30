@@ -4,20 +4,22 @@ export { CLIMain } from './cli';
 
 // implement just enough of window to be useful to blockstack.js.
 // do this here, so we can be *sure* it's in RAM.
-const localStorageRAM = {};
+const localStorageRAM : Record<string, any> = {};
+
+declare var global : any;
 
 global['window'] = {
   location: {
     origin: 'localhost'
   },
   localStorage: {
-    getItem: function(itemName) {
+    getItem: function(itemName : string) {
       return localStorageRAM[itemName];
     },
-    setItem: function(itemName, itemValue) {
+    setItem: function(itemName : string, itemValue : any) {
       localStorageRAM[itemName] = itemValue;
     },
-    removeItem: function(itemName) {
+    removeItem: function(itemName : string) {
       delete localStorageRAM[itemName];
     }
   }

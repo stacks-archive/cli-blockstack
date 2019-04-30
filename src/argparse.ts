@@ -1,17 +1,17 @@
-/* @flow */
+import Ajv from 'ajv';
+import process from 'process';
 
-const Ajv = require('ajv');
-const process = require('process');
-const c32check = require('c32check');
+declare var c32check : any;
+var c32check = require('c32check');
 
 import os from 'os';
 import fs from 'fs';
 
 export const NAME_PATTERN = 
-  '^([0-9a-z_.+-]{3,37})$'
+  '^([0-9a-z_.+-]{3,37})$';
 
 export const NAMESPACE_PATTERN = 
-  '^([0-9a-z_-]{1,19})$'
+  '^([0-9a-z_-]{1,19})$';
 
 export const ADDRESS_CHARS = 
   '[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{1,35}';
@@ -65,7 +65,24 @@ export const TXID_PATTERN =
 
 export const BOOLEAN_PATTERN = '^(0|1|true|false)$'
 
-const LOG_CONFIG_DEFAULTS = {
+export interface CLI_LOG_CONFIG_TYPE {
+   level: string,
+   handleExceptions: boolean,
+   timestamp: boolean,
+   stringify: boolean,
+   colorize: boolean,
+   json: boolean
+};
+
+export interface CLI_CONFIG_TYPE {
+   blockstackAPIUrl: string,
+   blockstackNodeUrl: string,
+   broadcastServiceUrl: string,
+   utxoServiceUrl: string,
+   logConfig: CLI_LOG_CONFIG_TYPE
+};
+
+const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
   level: 'info',
   handleExceptions: true,
   timestamp: true,
@@ -74,7 +91,7 @@ const LOG_CONFIG_DEFAULTS = {
   json: true
 }
 
-const CONFIG_DEFAULTS = {
+const CONFIG_DEFAULTS : CLI_CONFIG_TYPE = {
   blockstackAPIUrl: 'https://core.blockstack.org',
   blockstackNodeUrl: 'https://node.blockstack.org:6263',
   broadcastServiceUrl: 'https://broadcast.blockstack.org',
@@ -82,7 +99,7 @@ const CONFIG_DEFAULTS = {
   logConfig: LOG_CONFIG_DEFAULTS
 };
 
-const CONFIG_REGTEST_DEFAULTS = {
+const CONFIG_REGTEST_DEFAULTS : CLI_CONFIG_TYPE = {
   blockstackAPIUrl: 'http://localhost:16268',
   blockstackNodeUrl: 'http://localhost:16264',
   broadcastServiceUrl: 'http://localhost:16269',
@@ -105,6 +122,25 @@ export const DEFAULT_CONFIG_REGTEST_PATH = '~/.blockstack-cli-regtest.conf'
 export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf'
 
 export const DEFAULT_MAX_ID_SEARCH_INDEX = 256
+
+interface CLI_PROP_ITEM {
+ name: string;
+ type: 'string';
+ realtype: string;
+ pattern?: string;
+}
+
+
+interface CLI_PROP {
+ [index: string]: {
+   type: "array",
+   items: CLI_PROP_ITEM[]
+   minItems: number,
+   maxItems: number,
+   help: string,
+   group: string
+ }
+}
 
 // CLI usage
 export const CLI_ARGS = {
@@ -966,7 +1002,7 @@ export const CLI_ARGS = {
       '\n' +
       '    $ # get the first 3 owner keys and addresses for a backup phrase\n' +
       '    $ export BACKUP_PHRASE="soap fog wealth upon actual blossom neither timber phone exile monkey vocal"\n' +
-      '    $ blockstack-cli get_owner_keys "$BACKKUP_PHRASE" 3\n' +
+      '    $ blockstack-cli get_owner_keys "$BACKUP_PHRASE" 3\n' +
       '    [\n' +
       '      {\n' +
       '        "privateKey": "14b0811d5cd3486d47279d8f3a97008647c64586b121e99862c18863e2a4183501",\n' +
@@ -1902,14 +1938,20 @@ export const CLI_ARGS = {
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
         },
         {
+          name: 'bitcoin_fee_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+        },
+        {
           name: 'memo',
           type: 'string',
           realtype: 'string',
           pattern: '^.{0,34}$',
         },
       ],
-      minItems: 4,
-      maxItems: 5,
+      minItems: 5,
+      maxItems: 6,
       help: 'Send a particular type of tokens to the given ADDRESS.  Right now, only supported TOKEN-TYPE is "STACKS".  Optionally ' +
       'include a memo string (MEMO) up to 34 characters long.\n' +
       '\n' +
@@ -1926,6 +1968,7 @@ export const CLI_ARGS = {
       '    $ # check balances of sender and recipient before sending.\n' +
       '    $ # address of the key below is SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
+       '    $ export BTC_PAYMENT="4be95a5987ec727c033aa48a3fb1dbadb750446c1c63a02707a0b1c28e7ec17801"\n' +
       '    $ blockstack-cli balance SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    {\n' +
       '      "BTC": "125500"\n' +
@@ -1938,7 +1981,7 @@ export const CLI_ARGS = {
       '    }\n' +
       '\n' +
       '    $ # send tokens\n' +
-      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY STACKS 12345 "$PAYMENT"\n' +
+      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY STACKS 12345 "$PAYMENT" "$BTC_PAYMENT"\n' +
       '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
       '\n' +
       '    $ # wait 7 confirmations\n' +
@@ -2233,7 +2276,7 @@ export const CLI_ARGS = {
       '\n',
       group: 'Peer Services',
     },
-  },
+  } as CLI_PROP,
   additionalProperties: false,
   strict: true
 };
@@ -2345,7 +2388,12 @@ function formatHelpString(indent: number, limit: number, helpString: string) : s
  *            --arg_name TYPE
  *            [--arg_name TYPE]
  */
-function formatCommandHelpLines(commandName: string, commandArgs: Array<Object>) : Object {
+interface CLI_COMMAND_HELP {
+   raw: string;
+   kw: string
+}
+
+function formatCommandHelpLines(commandName: string, commandArgs: Array<CLI_PROP_ITEM>) : CLI_COMMAND_HELP {
   let rawUsage = '';
   let kwUsage = '';
   let kwPad = '';
@@ -2387,14 +2435,23 @@ function formatCommandHelpLines(commandName: string, commandArgs: Array<Object>)
     kwUsage += kwPad;
   }
 
-  return {'raw': rawUsage, 'kw': kwUsage};
+  return {'raw': rawUsage, 'kw': kwUsage} as CLI_COMMAND_HELP;
 }
 
 /*
  * Get the set of commands grouped by command group
  */
-function getCommandGroups() : Object {
-  let groups = {};
+interface CLI_COMMAND_GROUP_ITEM {
+   command: string;
+   help: string
+}
+
+interface CLI_COMMAND_GROUP {
+   [index: string] : CLI_COMMAND_GROUP_ITEM[]
+};
+
+function getCommandGroups() : CLI_COMMAND_GROUP {
+  let groups : CLI_COMMAND_GROUP = {};
   const commands = Object.keys(CLI_ARGS.properties);
   for (let i = 0; i < commands.length; i++) {
     const command = commands[i];
@@ -2402,14 +2459,20 @@ function getCommandGroups() : Object {
     const help = CLI_ARGS.properties[command].help;
     
     if (!groups.hasOwnProperty(group)) {
-      groups[group] = [Object.assign({}, CLI_ARGS.properties[command], {
-        'command': command
-      })];
+        groups[group] = [
+           {
+              'command': command,
+              'help': CLI_ARGS.properties[command].help
+           } as CLI_COMMAND_GROUP_ITEM 
+        ];
     }
     else {
-      groups[group].push(Object.assign({}, CLI_ARGS.properties[command], {
-        'command': command
-      }));
+       groups[group].push(
+          {
+             'command': command,
+             'help': CLI_ARGS.properties[command].help
+          } as CLI_COMMAND_GROUP_ITEM
+       );
     }
   }
   return groups;
@@ -2467,7 +2530,7 @@ export function makeAllCommandsHelp(): string {
 /*
  * Make a usage string for a single command
  */
-export function makeCommandUsageString(command: ?string) : string {
+export function makeCommandUsageString(command?: string) : string {
   let res = "";
   if (command === 'all') {
     return makeAllCommandsHelp();
@@ -2546,9 +2609,13 @@ export function printUsage() {
  * or to a value.
  * The key _ is mapped to the non-opts list.
  */
-export function getCLIOpts(argv: Array<string>, 
-                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : Object {
-  let optsTable = {};
+interface CLI_OPTS {
+   [index: string]: null | boolean | string | string[]
+};
+
+export function getCLIOpts(argv: string[],
+                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : CLI_OPTS {
+  let optsTable : CLI_OPTS = {};
   let remainingArgv = [];
   let argvBuff = argv.slice(0);
 
@@ -2603,6 +2670,51 @@ export function getCLIOpts(argv: Array<string>,
   return optsTable;
 }
 
+export function CLIOptAsString(opts: CLI_OPTS, key: string) : string | null {
+   if (opts[key] === null || opts[key] === undefined) {
+      return null;
+   }
+   else if (typeof opts[key] === 'string') {
+      return `${opts[key]}`;
+   }
+   else {
+      throw new Error(`Option '${key}' is not a string`);
+   }
+}
+
+export function CLIOptAsBool(opts: CLI_OPTS, key: string) : boolean {
+   if (typeof opts[key] === 'boolean' || opts[key] === null) {
+      return !!opts[key];
+   }
+   else {
+      throw new Error(`Option '${key}' is not a boolean`);
+   }
+}
+
+function isStringArray(value: any): value is string[] {
+   if (value instanceof Array) {
+      return value
+         .map((s: any) => typeof s === 'string')
+         .reduce((x: boolean, y: boolean) => x && y, true);
+   }
+   else {
+      return false;
+   }
+}
+
+export function CLIOptAsStringArray(opts: CLI_OPTS, key: string) : string[] | null {
+   let value : any = opts[key];
+   if (value === null || value === undefined) {
+      return null;
+   }
+   else if (isStringArray(value)) {
+      return value;
+   }
+   else {
+      throw new Error(`Option '${key}' is not a string array`);
+   }
+}
+
 
 /*
  * Use the CLI schema to get all positional and keyword args
@@ -2615,7 +2727,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
   }
 
   let orderedArgs = [];
-  let foundArgs = {};
+  let foundArgs : Record<string, string> = {};
 
   // scan for keywords 
   for (let i = 0; i < argsList.length; i++) {
@@ -2705,21 +2817,21 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
 /*
  * Check command args
  */
-type checkArgsSuccessType = {
-  'success': true,
-  'command': string,
-  'args': Array<?string>
+export interface CheckArgsSuccessType {
+  success: true;
+  command: string;
+  args: Array<string>
 };
 
-type checkArgsFailType = {
-  'success': false,
-  'error': string,
-  'command': string,
-  'usage': boolean
+export interface CheckArgsFailType {
+  success: false;
+  error: string;
+  command: string;
+  usage: boolean
 };
 
 export function checkArgs(argList: Array<string>) 
-  : checkArgsSuccessType | checkArgsFailType {
+  : CheckArgsSuccessType | CheckArgsFailType {
   if (argList.length <= 2) {
      return {
        'success': false,
@@ -2794,13 +2906,13 @@ export function checkArgs(argList: Array<string>)
  * @configPath (string) the path to the config file.
  * @networkType (sring) 'mainnet', 'regtest', or 'testnet'
  */
-export function loadConfig(configFile: string, networkType: string) : Object {
+export function loadConfig(configFile: string, networkType: string) : CLI_CONFIG_TYPE {
   if (networkType !== 'mainnet' && networkType !== 'testnet' && networkType != 'regtest') {
     throw new Error("Unregognized network")
   }
 
   let configData = null;
-  let configRet = null;
+  let configRet : CLI_CONFIG_TYPE;
 
   if (networkType === 'mainnet') {
     configRet = Object.assign({}, CONFIG_DEFAULTS);
@@ -2811,8 +2923,7 @@ export function loadConfig(configFile: string, networkType: string) : Object {
   }
 
   try {
-    configData = JSON.parse(fs.readFileSync(configFile).toString());
-    Object.assign(configRet, configData);
+    configRet = JSON.parse(fs.readFileSync(configFile).toString()) as CLI_CONFIG_TYPE;
   }
   catch (e) {
     ;

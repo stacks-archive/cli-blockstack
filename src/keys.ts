@@ -1,15 +1,16 @@
-/* @flow */
-
 // TODO: most of this code should be in blockstack.js
 // Will remove most of this code once the wallet functionality is there instead.
 
-const blockstack = require('blockstack')
-const keychains = require('blockstack-keychains')
-const bitcoin = require('bitcoinjs-lib')
-const bip39 = require('bip39')
-const bip32 = require('bip32')
-const crypto = require('crypto')
-const c32check = require('c32check')
+import blockstack from 'blockstack';
+import * as bitcoin from 'bitcoinjs-lib';
+import bip39 from 'bip39';
+import crypto from 'crypto';
+
+declare var c32check : any;
+var c32check = require('c32check');
+
+declare var keychains : any;
+var keychains = require("blockstack-keychains");
 
 import {
   getPrivateKeyAddress
@@ -19,13 +20,42 @@ import {
   getMaxIDSearchIndex
 } from './cli';
 
-import type BIP32 from 'bip32';
+import {
+   CLINetworkAdapter
+} from './network';
+
+import * as bip32 from 'bip32';
+import { BIP32 } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
 
-function toPrivkeyHex(k : Object) : string {
-  return `${k.privateKey.toString('hex')}01`;
-}
+export interface OwnerKeyInfoType {
+   privateKey: string;
+   version: string;
+   index: number;
+   idAddress: string;
+};
+
+export interface PaymentKeyInfoType {
+   privateKey: string;
+   address: {
+      BTC: string;
+      STACKS: string;
+   };
+   index: number
+};
+
+export interface AppKeyInfoType {
+   keyInfo: {
+      privateKey: string;
+      address: string;
+   };
+   legacyKeyInfo: {
+      privateKey: string;
+      address: string;
+   };
+   ownerKeyIndex: number
+};
 
 function walletFromMnemonic(mnemonic: string): blockstack.BlockstackWallet {
   const seed = bip39.mnemonicToSeed(mnemonic)
@@ -48,10 +78,10 @@ function getNodePrivateKey(node: BIP32): string {
  *    .version (string) the version string of the derivation
  *    .idAddress (string) the ID-address
  */
-export function getOwnerKeyInfo(network: Object,
+export function getOwnerKeyInfo(network: CLINetworkAdapter,
                                 mnemonic : string, 
                                 index : number, 
-                                version : string = 'v0.10-current') {
+                                version : string = 'v0.10-current'): OwnerKeyInfoType {
 
   const wallet = walletFromMnemonic(mnemonic);
   const identity = wallet.getIdentityAddressNode(index);
@@ -62,7 +92,7 @@ export function getOwnerKeyInfo(network: Object,
     version: version,
     index: index,
     idAddress: `ID-${addr}`,
-  };
+  } as OwnerKeyInfoType;
 }
 
 /*
@@ -74,7 +104,7 @@ export function getOwnerKeyInfo(network: Object,
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
-export function getPaymentKeyInfo(network: Object, mnemonic : string) {
+export function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : string): PaymentKeyInfoType {
   const wallet = walletFromMnemonic(mnemonic);
   const privkey = wallet.getBitcoinPrivateKey(0);
   const addr = getPrivateKeyAddress(network, privkey);
@@ -85,7 +115,7 @@ export function getPaymentKeyInfo(network: Object, mnemonic : string) {
       STACKS: c32check.b58ToC32(addr),
     },
     index: 0
-  };
+  } as PaymentKeyInfoType;
 }
 
 /*
@@ -93,7 +123,7 @@ export function getPaymentKeyInfo(network: Object, mnemonic : string) {
  * Returns the index if found
  * Returns -1 if not found
  */
-export function findIdentityIndex(network: Object, mnemonic: string, idAddress: string, maxIndex: ?number) {
+export function findIdentityIndex(network: CLINetworkAdapter, mnemonic: string, idAddress: string, maxIndex?: number) : number {
   if (!maxIndex) {
     maxIndex = getMaxIDSearchIndex();
   }
@@ -131,11 +161,11 @@ export function findIdentityIndex(network: Object, mnemonic: string, idAddress: 
  *      .privateKey (string) the app's hex private key
  *      .address (string) the address of the private key
  */
-export function getApplicationKeyInfo(network: Object,
+export function getApplicationKeyInfo(network: CLINetworkAdapter,
                                       mnemonic : string, 
                                       idAddress: string, 
                                       appDomain: string, 
-                                      idIndex: ?number) {
+                                      idIndex?: number) : AppKeyInfoType {
   if (!idIndex) {
     idIndex = -1;
   }
@@ -157,7 +187,7 @@ export function getApplicationKeyInfo(network: Object,
     appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
 
   // TODO: figure out when we can start using the new derivation path
-  const res = {
+  const res : AppKeyInfoType = {
     keyInfo: {
       privateKey: 'TODO', // appPrivateKey,
       address: 'TODO', // getPrivateKeyAddress(network, `${appPrivateKey}01`)
@@ -175,10 +205,10 @@ export function getApplicationKeyInfo(network: Object,
  * Extract the "right" app key
  */
 export function extractAppKey(
-  network: Object,
+  network: CLINetworkAdapter,
   appKeyInfo: { keyInfo: { privateKey: string, address: string }, legacyKeyInfo: { privateKey : string, address: string } },
   appAddress?: string
-) {
+) : string {
   if (appAddress) {
     if (network.coerceMainnetAddress(appKeyInfo.keyInfo.address) === network.coerceMainnetAddress(appAddress)) {
       return appKeyInfo.keyInfo.privateKey;

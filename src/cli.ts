@@ -1,7 +1,5 @@
-/* @flow */
-
-const blockstack = require('blockstack');
-const bitcoin = require('bitcoinjs-lib');
+import blockstack from 'blockstack';
+import * as bitcoin from 'bitcoinjs-lib';
 import process from 'process';
 import fs from 'fs';
 import winston from 'winston'
@@ -9,21 +7,29 @@ import logger from 'winston'
 import expressWinston from 'express-winston'
 import cors from 'cors'
 import RIPEMD160 from 'ripemd160'
+import BN from 'bn.js'
+import URL from 'url'
+import crypto from 'crypto'
+import bip39 from 'bip39'
+import express from 'express'
+import * as pathTools from 'path'
 
-const bigi = require('bigi')
-const URL = require('url')
-const bip39 = require('bip39')
-const crypto = require('crypto')
-const ZoneFile = require('zone-file')
-const c32check = require('c32check')
-const express = require('express')
-const jsontokens = require('jsontokens')
-const pathTools = require('path')
+declare var jsontokens : any;
+var jsontokens = require('jsontokens');
+
+declare var c32check : any;
+var c32check = require('c32check');
+
+declare var ZoneFile : any;
+var ZoneFile = require('zone-file')
 
 import {
-  parseZoneFile,
-  makeZoneFile
-} from 'zone-file';
+   UserData
+} from 'blockstack/lib/auth/authApp';
+
+import {
+   GaiaHubConfig
+} from 'blockstack/lib/storage/hub';
 
 import {
   getOwnerKeyInfo,
@@ -36,6 +42,11 @@ import {
 import {
   CLI_ARGS,
   getCLIOpts,
+  CLIOptAsString,
+  CLIOptAsStringArray,
+  CLIOptAsBool,
+  CheckArgsSuccessType,
+  CheckArgsFailType,
   printUsage,
   checkArgs,
   loadConfig,
@@ -58,7 +69,10 @@ import {
 
 import {
   CLINetworkAdapter,
-  getNetwork
+  CLI_NETWORK_OPTS,
+  getNetwork,
+  NameInfoType,
+  PriceType
 } from './network';
 
 import {
@@ -89,8 +103,10 @@ import {
   getBackupPhrase,
   mkdirs,
   getIDAddress,
+  IDAppKeys,
   getIDAppKeys,
-  hasKeys
+  hasKeys,
+  UTXO
 } from './utils';
 
 import {
@@ -113,43 +129,75 @@ export function getMaxIDSearchIndex() {
   return maxIDSearchIndex;
 }
 
+export interface WhoisInfoType {
+   address: string;
+   blockchain: string;
+   block_renewed_at: number;
+   did: string;
+   expire_block: number;
+   grace_period: number;
+   last_transaction_height: number;
+   last_txid: string;
+   owner_address: string;
+   owner_script: string;
+   renewal_deadline: number;
+   resolver: string | null;
+   status: string;
+   zonefile: string | null;
+   zonefile_hash: string | null;
+}
+
 /*
  * Get a name's record information
  * args:
  * @name (string) the name to query
  */
-function whois(network: Object, args: Array<string>) {
+function whois(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   return network.getNameInfo(name)
-    .then((nameInfo) => {
+   .then((nameInfo : NameInfoType) => {
       if (BLOCKSTACK_TEST) {
         // the test framework expects a few more fields.
         // these are for compatibility with the old CLI.
         // you are not required to understand them.
         return Promise.all([network.getNameHistory(name, 0), network.getBlockHeight()])
-          .then(([nameHistory, blockHeight]) => {
+          .then(([nameHistory, blockHeight] : [any, number]) => {
             if (nameInfo.renewal_deadline > 0 && nameInfo.renewal_deadline <= blockHeight) {
-              return {'error': 'Name expired'}
+               return {'error': 'Name expired'};
             }
 
-            const blocks = Object.keys(nameHistory);
-            const lastBlock = blocks.sort().slice(-1)[0];
+            const blocks : string[] = Object.keys(nameHistory);
+            const lastBlock : number = parseInt(blocks.sort().slice(-1)[0]);
+            const blockRenewedAt : number = parseInt(nameHistory[lastBlock].slice(-1)[0].last_renewed);
+            const ownerScript = bitcoin.address.toOutputScript(
+                network.coerceMainnetAddress(nameInfo.address)).toString('hex');
 
-            return Object.assign({}, nameInfo, {
-              'owner_address': nameInfo.address,
-              'owner_script': bitcoin.address.toOutputScript(
-                network.coerceMainnetAddress(nameInfo.address)).toString('hex'),
-              'last_transaction_height': lastBlock,
-              'block_renewed_at': nameHistory[lastBlock].slice(-1)[0].last_renewed,
-            });
+            const whois : WhoisInfoType = {
+               address: nameInfo.address,
+               blockchain: nameInfo.blockchain,
+               block_renewed_at: blockRenewedAt,
+               did: nameInfo.did,
+               expire_block: nameInfo.expire_block,
+               grace_period: nameInfo.grace_period,
+               last_transaction_height: lastBlock,
+               last_txid: nameInfo.last_txid,
+               owner_address: nameInfo.address,
+               owner_script: ownerScript,
+               renewal_deadline: nameInfo.renewal_deadline,
+               resolver: nameInfo.resolver,
+               status: nameInfo.status,
+               zonefile: nameInfo.zonefile,
+               zonefile_hash: nameInfo.zonefile_hash
+            };
+            return whois;
           })
+          .then((whoisInfo : any) => JSONStringify(whoisInfo, true))
       }
       else {
-        return nameInfo;
+         return Promise.resolve().then(() => JSONStringify(nameInfo, true));
       }
     })
-    .then(whoisInfo => JSONStringify(whoisInfo))
-    .catch((error) => {
+    .catch((error : Error) => {
       if (error.message === 'Name not found') {
         return JSONStringify({'error': 'Name not found'}, true);
       }
@@ -164,10 +212,10 @@ function whois(network: Object, args: Array<string>) {
  * args:
  * @name (string) the name to query
  */
-function price(network: Object, args: Array<string>) {
+function price(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   return network.getNamePrice(name)
-    .then(priceInfo => JSONStringify(
+    .then((priceInfo : PriceType) => JSONStringify(
       { units: priceInfo.units, amount: priceInfo.amount.toString() }));
 }
 
@@ -176,10 +224,10 @@ function price(network: Object, args: Array<string>) {
  * args:
  * @namespaceID (string) the namespace to query
  */
-function priceNamespace(network: Object, args: Array<string>) {
+function priceNamespace(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   return network.getNamespacePrice(namespaceID)
-    .then(priceInfo => JSONStringify(
+    .then((priceInfo : PriceType) => JSONStringify(
       { units: priceInfo.units, amount: priceInfo.amount.toString() }));
 }
 
@@ -188,7 +236,7 @@ function priceNamespace(network: Object, args: Array<string>) {
  * args:
  * @address (string) the address to query
  */
-function names(network: Object, args: Array<string>) {
+function names(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const IDaddress = args[0];
   if (!IDaddress.startsWith('ID-')) {
     throw new Error("Must be an ID-address");
@@ -196,7 +244,7 @@ function names(network: Object, args: Array<string>) {
 
   const address = IDaddress.slice(3);
   return network.getNamesOwned(address)
-    .then(namesList => JSONStringify(namesList));
+    .then((namesList : string[]) => JSONStringify(namesList));
 }
 
 /*
@@ -204,13 +252,13 @@ function names(network: Object, args: Array<string>) {
  * args:
  * @name (string) the name to look up
  */
-function lookup(network: Object, args: Array<string>) {
+function lookup(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   network.setCoerceMainnetAddress(true);
 
   const name = args[0];
   return nameLookup(network, name)
     .then((nameLookupInfo) => JSONStringify(nameLookupInfo))
-    .catch((e) => JSONStringify({ error: e.message }));
+    .catch((e : Error) => JSONStringify({ error: e.message }));
 }
 
 /*
@@ -218,15 +266,15 @@ function lookup(network: Object, args: Array<string>) {
  * args:
  * @name (string) the name to query
  */
-function getNameBlockchainRecord(network: Object, args: Array<string>) {
+function getNameBlockchainRecord(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   return Promise.resolve().then(() => {
     return network.getBlockchainNameRecord(name);
   })
-  .then((nameInfo) => {
+  .then((nameInfo : any) => {
     return JSONStringify(nameInfo);
   })
-  .catch((e) => {
+  .catch((e : Error) => {
     if (e.message === 'Bad response status: 404') {
       return JSONStringify({ 'error': 'Name not found'}, true);
     }
@@ -240,24 +288,24 @@ function getNameBlockchainRecord(network: Object, args: Array<string>) {
  * Get all of a name's history
  */
 
-function getAllNameHistoryPages(network: Object, name: string, page: number) {
+function getAllNameHistoryPages(network: CLINetworkAdapter, name: string, page: number) {
   return new Promise((resolve, reject) => {
     let history = {};
     return network.getNameHistory(name, page)
-      .then((results) => {
+      .then((results : any) => {
         if (Object.keys(results).length == 0) {
           resolve(history);
         }
         else {
           history = Object.assign(history, results);
           getAllNameHistoryPages(network, name, page + 1)
-            .then((rest) => {
+            .then((rest : any) => {
               history = Object.assign(history, rest);
               resolve(history);
             })
         }
       })
-      .catch((e) => {
+      .catch((e : Error) => {
         resolve(history);
       });
   });
@@ -269,23 +317,23 @@ function getAllNameHistoryPages(network: Object, name: string, page: number) {
  * @name (string) the name to query
  * @page (string) the page to query (OPTIONAL)
  */
-function getNameHistoryRecord(network: Object, args: Array<string>) {
+function getNameHistoryRecord(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
-  let page;
+  let page : number;
 
   if (args.length >= 2 && args[1] !== null && args[1] !== undefined) {
     page = parseInt(args[1]);
     return Promise.resolve().then(() => {
       return network.getNameHistory(name, page);
     })
-    .then((nameHistory) => {
+    .then((nameHistory : any) => {
       return JSONStringify(nameHistory);
     });
   }
   else {
     // all pages 
     return getAllNameHistoryPages(network, name, 0)
-      .then((history) => JSONStringify(history));
+      .then((history : any) => JSONStringify(history));
   }
 }
 
@@ -294,15 +342,15 @@ function getNameHistoryRecord(network: Object, args: Array<string>) {
  * args:
  * @namespaceID (string) the namespace to query
  */
-function getNamespaceBlockchainRecord(network: Object, args: Array<string>) {
+function getNamespaceBlockchainRecord(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   return Promise.resolve().then(() => {
     return network.getNamespaceInfo(namespaceID);
   })
-  .then((namespaceInfo) => {
+  .then((namespaceInfo : any) => {
     return JSONStringify(namespaceInfo);
   })
-  .catch((e) => {
+  .catch((e : Error) => {
     if (e.message === 'Namespace not found') {
       return JSONStringify({'error': 'Namespace not found'}, true);
     }
@@ -317,7 +365,7 @@ function getNamespaceBlockchainRecord(network: Object, args: Array<string>) {
  * args:
  * @zonefile_hash (string) the hash of the zone file to query
  */
-function getZonefile(network: Object, args: Array<string>) {
+function getZonefile(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const zonefileHash = args[0];
   return network.getZonefile(zonefileHash)
 }
@@ -330,7 +378,7 @@ function getZonefile(network: Object, args: Array<string>) {
  * @paymentKey (string) the payment private key
  * @preorderTxOnly (boolean) OPTIONAL: used internally to only return a tx (overrides CLI)
  */
-function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boolean = false) {
+function txPreorder(network: CLINetworkAdapter, args: string[], preorderTxOnly: boolean = false) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -348,7 +396,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
-  const estimatePromise = paymentUTXOsPromise.then((utxos) => {
+  const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
         const numUTXOs = utxos.length;
         return blockstack.transactions.estimatePreorder(
           name, network.coerceAddress(address), 
@@ -356,7 +404,8 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
       });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
   
   if (!safetyChecks) {
@@ -371,7 +420,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
     }
   }
 
-  const paymentBalance = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalance = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
 
@@ -411,7 +460,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
           addressCanReceiveName && !isInGracePeriod && paymentBalance >= estimate &&
           trueNamespaceBurnAddress === givenNamespaceBurnAddress &&
           (namePrice.units === 'BTC' || (namePrice.units == 'STACKS'
-           && namePrice.amount.compareTo(STACKSBalance) <= 0))) {
+           && namePrice.amount.cmp(STACKSBalance) <= 0))) {
         return {'status': true};
       }
       else {
@@ -435,26 +484,19 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        if (preorderTxOnly) {
-          // only care about safety checks or tx 
-          return new Promise((resolve) => resolve(safetyChecksResult));
-        }
-        else {
-          // expect a string either way
-          return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
-        }
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly || preorderTxOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -472,7 +514,7 @@ function txPreorder(network: Object, args: Array<string>, preorderTxOnly: ?boole
  *  (in which case, @zonefile will be ignored)
  * @registerTxOnly (boolean) OPTIONAL: used internally to coerce returning only the tx
  */
-function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boolean = false) {
+function txRegister(network: CLINetworkAdapter, args: string[], registerTxOnly: boolean = false) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -511,7 +553,7 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
   const paymentAddress = getPrivateKeyAddress(network, paymentKey);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
-  const estimatePromise = paymentUTXOsPromise.then((utxos) => {
+  const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
         const numUTXOs = utxos.length;
         return blockstack.transactions.estimateRegister(
           name, network.coerceAddress(address),
@@ -522,7 +564,8 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
     name, address, paymentKey, zonefile, zonefileHash, !hasKeys(paymentKey));
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -531,13 +574,13 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx: string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const paymentBalancePromise = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalancePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
  
@@ -586,15 +629,10 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
     });
   
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
         if (registerTxOnly) {
-          // only care about safety checks or tx 
-          return new Promise((resolve) => resolve(safetyChecksResult));
-        }
-        else {
-          // expect a string either way
-          return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
+          return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
         }
       }
 
@@ -602,13 +640,25 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
+}
+
+
+// helper to be used with txPreorder and txRegister to determine whether or not the operation failed
+function checkTxStatus(txOrJson: string) : boolean {
+   try {
+      const json = JSON.parse(txOrJson);
+      return !!json.status;
+   }
+   catch(e) {
+      return true;
+   }
 }
 
 /*
@@ -619,11 +669,11 @@ function txRegister(network: Object, args: Array<string>, registerTxOnly: ?boole
  * @idAddress (string) the ID address that owns the name
  * @gaiaHub (string) the URL to the write endpoint to store the name's profile
  */
-function makeZonefile(network: Object, args: Array<string>) {
+function makeZonefile(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const idAddress = args[1];
   const gaiaHub = args[2];
-  let resolver;
+  let resolver : string = '';
 
   if (!idAddress.startsWith('ID-')) {
     throw new Error("ID-address must start with ID-");
@@ -672,7 +722,7 @@ function makeZonefile(network: Object, args: Array<string>) {
  * @zonefileHash (string) the zone file hash to use, if given
  *   (will be used instead of the zonefile)
  */
-function update(network: Object, args: Array<string>) {
+function update(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   let zonefilePath = args[1];
   const ownerKey = decodePrivateKey(args[2]);
@@ -699,7 +749,7 @@ function update(network: Object, args: Array<string>) {
 
   const estimatePromise = Promise.all([
       ownerUTXOsPromise, paymentUTXOsPromise])
-    .then(([ownerUTXOs, paymentUTXOs]) => {
+    .then(([ownerUTXOs, paymentUTXOs] : [UTXO[], UTXO[]]) => {
         const numOwnerUTXOs = ownerUTXOs.length;
         const numPaymentUTXOs = paymentUTXOs.length;
         return blockstack.transactions.estimateUpdate(
@@ -712,7 +762,8 @@ function update(network: Object, args: Array<string>) {
     name, ownerKey, paymentKey, zonefile, zonefileHash, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
-    return estimatePromise;
+     return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -721,13 +772,13 @@ function update(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const paymentBalancePromise = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalancePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
 
@@ -743,7 +794,7 @@ function update(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Name cannot be safely updated',
           'isNameValid': isNameValid,
@@ -751,24 +802,24 @@ function update(network: Object, args: Array<string>) {
           'isInGracePeriod': isInGracePeriod,
           'estimateCostBTC': estimateCost,
           'paymentBalanceBTC': paymentBalance,
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
     .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -783,7 +834,7 @@ function update(network: Object, args: Array<string>) {
  * @ownerKey (string) the owner private key
  * @paymentKey (string) the payment private key
  */
-function transfer(network: Object, args: Array<string>) {
+function transfer(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const keepZoneFile = (args[2].toLowerCase() === 'true');
@@ -802,7 +853,7 @@ function transfer(network: Object, args: Array<string>) {
 
   const estimatePromise = Promise.all([
       ownerUTXOsPromise, paymentUTXOsPromise])
-    .then(([ownerUTXOs, paymentUTXOs]) => {
+    .then(([ownerUTXOs, paymentUTXOs] : [UTXO[], UTXO[]]) => {
         const numOwnerUTXOs = ownerUTXOs.length;
         const numPaymentUTXOs = paymentUTXOs.length;
         return blockstack.transactions.estimateTransfer(
@@ -816,7 +867,8 @@ function transfer(network: Object, args: Array<string>) {
     name, address, ownerKey, paymentKey, keepZoneFile, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -825,13 +877,13 @@ function transfer(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const paymentBalancePromise = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalancePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
   
@@ -850,7 +902,7 @@ function transfer(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Name cannot be safely transferred',
           'isNameValid': isNameValid,
@@ -859,24 +911,24 @@ function transfer(network: Object, args: Array<string>) {
           'isInGracePeriod': isInGracePeriod,
           'estimateCostBTC': estimateCost,
           'paymentBalanceBTC': paymentBalance,
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
     .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -885,10 +937,10 @@ function transfer(network: Object, args: Array<string>) {
 /*
  * Get the last zone file hash
  */
-function getLastZonefileHash(network: Object, name: string): Promise<string> {
+function getLastZonefileHash(network: CLINetworkAdapter, name: string): Promise<string> {
   return getAllNameHistoryPages(network, name, 0)
-    .then((nameHistory) => {
-      let zfh = null;
+    .then((nameHistory : any) => {
+      let zfh : string = '';
       const blockHeights = Object.keys(nameHistory).sort().reverse();
       for (let i = 0; i < blockHeights.length; i++) {
         const blockHeight = blockHeights[i];
@@ -923,7 +975,7 @@ function getLastZonefileHash(network: Object, name: string): Promise<string> {
  * @zonefilePath (string) OPTIONAL: the path to the new zone file
  * @zonefileHash (string) OPTINOAL: use the given zonefile hash.  Supercedes zonefile.
  */
-function renew(network: Object, args: Array<string>) {
+function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const paymentKey = decodePrivateKey(args[2]);
@@ -931,10 +983,10 @@ function renew(network: Object, args: Array<string>) {
   const paymentAddress = getPrivateKeyAddress(network, paymentKey);
   const namespaceID = name.split('.').slice(-1)[0];
 
-  let newAddress = null;
-  let zonefilePath = null;
-  let zonefileHash = null;
-  let zonefile = null;
+  let newAddress : string = '';
+  let zonefilePath : string = '';
+  let zonefileHash : string = '';
+  let zonefile : string = '';
 
   if (args.length >= 4 && !!args[3]) {
     // ID-address
@@ -963,7 +1015,7 @@ function renew(network: Object, args: Array<string>) {
 
   const estimatePromise = Promise.all([
       ownerUTXOsPromise, paymentUTXOsPromise])
-    .then(([ownerUTXOs, paymentUTXOs]) => {
+    .then(([ownerUTXOs, paymentUTXOs] : [UTXO[], UTXO[]]) => {
         const numOwnerUTXOs = ownerUTXOs.length;
         const numPaymentUTXOs = paymentUTXOs.length;
         return blockstack.transactions.estimateRenewal(
@@ -973,9 +1025,9 @@ function renew(network: Object, args: Array<string>) {
           numOwnerUTXOs + numPaymentUTXOs - 1);
       });
 
-  const zonefileHashPromise = new Promise((resolve, reject) => {
+  const zonefileHashPromise = new Promise((resolve : any, reject : any) => {
     if (!!zonefile) {
-      const sha256 = bitcoin.crypto.sha256(zonefile)
+      const sha256 = bitcoin.crypto.sha256(new Buffer(zonefile))
       const h = (new RIPEMD160()).update(sha256).digest('hex')
       resolve(h);
     } else if (!!zonefileHash) {
@@ -983,21 +1035,22 @@ function renew(network: Object, args: Array<string>) {
       resolve(zonefileHash);
     } else {
       return getLastZonefileHash(network, name)
-        .then(zfh => resolve(zfh))
-        .catch(e => reject(e));
+        .then((zfh : string) => resolve(zfh))
+        .catch((e : Error) => reject(e));
     }
   })
-  .catch((e) => {
+  .catch((e : Error) => {
     console.error(e);
   });
 
-  const txPromise = zonefileHashPromise.then((zfh) => {
+  const txPromise = zonefileHashPromise.then((zfh : string) => {
     return blockstack.transactions.makeRenewal(
       name, newAddress, ownerKey, paymentKey, zonefile, zfh, !hasKeys(ownerKey) || !hasKeys(paymentKey));
   });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -1006,7 +1059,7 @@ function renew(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
@@ -1042,12 +1095,12 @@ function renew(network: Object, args: Array<string>) {
       if (isNameValid && ownsName && addressCanReceiveName && 
           trueNSBurnAddr === givenNSBurnAddr &&
           (nameCost.units === 'BTC' || (nameCost.units == 'STACKS' &&
-           nameCost.amount.compareTo(accountBalance) <= 0)) &&
+           nameCost.amount.cmp(accountBalance) <= 0)) &&
           estimateCost < paymentBalance) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Name cannot be safely renewed',
           'isNameValid': isNameValid,
@@ -1060,24 +1113,24 @@ function renew(network: Object, args: Array<string>) {
           'paymentBalanceStacks': accountBalance.toString(),
           'namespaceBurnAddress': givenNSBurnAddr,
           'trueNamespaceBurnAddress': trueNSBurnAddr,
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
     .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1090,7 +1143,7 @@ function renew(network: Object, args: Array<string>) {
  * @ownerKey (string) the owner private key
  * @paymentKey (string) the payment private key
  */
-function revoke(network: Object, args: Array<string>) {
+function revoke(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const paymentKey = decodePrivateKey(args[2]);
@@ -1115,7 +1168,8 @@ function revoke(network: Object, args: Array<string>) {
     name, ownerKey, paymentKey, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -1130,7 +1184,7 @@ function revoke(network: Object, args: Array<string>) {
     }
   }
 
-  const paymentBalancePromise = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalancePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
  
@@ -1146,7 +1200,7 @@ function revoke(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Name cannot be safely revoked',
           'isNameValid': isNameValid,
@@ -1154,24 +1208,24 @@ function revoke(network: Object, args: Array<string>) {
           'isInGracePeriod': isInGracePeriod,
           'estimateCostBTC': estimateCost,
           'paymentBalanceBTC': paymentBalance,
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
     .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1184,7 +1238,7 @@ function revoke(network: Object, args: Array<string>) {
  * @address (string) the address to reveal the namespace
  * @paymentKey (string) the payment private key
  */
-function namespacePreorder(network: Object, args: Array<string>) {
+function namespacePreorder(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const address = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -1195,7 +1249,7 @@ function namespacePreorder(network: Object, args: Array<string>) {
 
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
-  const estimatePromise = paymentUTXOsPromise.then((utxos) => {
+  const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
         const numUTXOs = utxos.length;
         return blockstack.transactions.estimateNamespacePreorder(
           namespaceID, network.coerceAddress(address), 
@@ -1203,7 +1257,8 @@ function namespacePreorder(network: Object, args: Array<string>) {
       });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
   
   if (!safetyChecks) {
@@ -1212,13 +1267,13 @@ function namespacePreorder(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const paymentBalance = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalance = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
 
@@ -1235,12 +1290,12 @@ function namespacePreorder(network: Object, args: Array<string>) {
       if (isNamespaceValid && isNamespaceAvailable && 
           (namespacePrice.units === 'BTC' || 
             (namespacePrice.units === 'STACKS' && 
-             namespacePrice.amount.compareTo(STACKSBalance) <= 0)) &&
+             namespacePrice.amount.cmp(STACKSBalance) <= 0)) &&
           paymentBalance >= estimate) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Namespace cannot be safely preordered',
           'isNamespaceValid': isNamespaceValid,
@@ -1250,24 +1305,24 @@ function namespacePreorder(network: Object, args: Array<string>) {
           'namespaceCostUnits': namespacePrice.units,
           'namespaceCostAmount': namespacePrice.amount.toString(),
           'estimateCostBTC': estimate,
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1287,7 +1342,7 @@ function namespacePreorder(network: Object, args: Array<string>) {
  * @noVowelDiscount (int) the no-vowel price discount
  * @paymentKey (string) the payment private key
  */
-function namespaceReveal(network: Object, args: Array<string>) {
+function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const revealAddr = args[1];
   const version = parseInt(args[2]);
@@ -1327,7 +1382,7 @@ function namespaceReveal(network: Object, args: Array<string>) {
   const paymentAddress = getPrivateKeyAddress(network, paymentKey);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
-  const estimatePromise = paymentUTXOsPromise.then((utxos) => {
+  const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
         const numUTXOs = utxos.length;
         return blockstack.transactions.estimateNamespaceReveal(
           namespace, network.coerceAddress(revealAddr),
@@ -1338,7 +1393,8 @@ function namespaceReveal(network: Object, args: Array<string>) {
     namespace, revealAddr, paymentKey, !hasKeys(paymentKey));
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -1347,13 +1403,13 @@ function namespaceReveal(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const paymentBalancePromise = paymentUTXOsPromise.then((utxos) => {
+  const paymentBalancePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
  
@@ -1371,31 +1427,31 @@ function namespaceReveal(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Namespace cannot be safely revealed',
           'isNamespaceValid': isNamespaceValid,
           'isNamespaceAvailable': isNamespaceAvailable,
           'paymentBalanceBTC': paymentBalance,
           'estimateCostBTC': estimate,
-        }, true);
+        };
       }
     });
   
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1407,7 +1463,7 @@ function namespaceReveal(network: Object, args: Array<string>) {
  * @namespaceID (string) the namespace ID
  * @revealKey (string) the hex-encoded reveal key
  */
-function namespaceReady(network: Object, args: Array<string>) {
+function namespaceReady(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const revealKey = decodePrivateKey(args[1]);
   const revealAddress = getPrivateKeyAddress(network, revealKey);
@@ -1424,7 +1480,8 @@ function namespaceReady(network: Object, args: Array<string>) {
       });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
   
   if (!safetyChecks) {
@@ -1433,13 +1490,13 @@ function namespaceReady(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return network.broadcastTransaction(tx);
         });
     }
   }
 
-  const revealBalancePromise = revealUTXOsPromise.then((utxos) => {
+  const revealBalancePromise = revealUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
 
@@ -1457,7 +1514,7 @@ function namespaceReady(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Namespace cannot be safely launched',
           'isNamespaceValid': isNamespaceValid,
@@ -1465,24 +1522,24 @@ function namespaceReady(network: Object, args: Array<string>) {
           'isPrivateKeyRevealer': isRevealer,
           'revealerBalanceBTC': revealerBalance,
           'estimateCostBTC': estimate
-        }, true);
+        };
       }
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1498,14 +1555,14 @@ function namespaceReady(network: Object, args: Array<string>) {
  * @zonefile (string) OPTIONAL: the path to the zone file to use (supercedes gaiaHubUrl)
  * @zonefileHash (string) OPTIONAL: the hash of the zone file (supercedes gaiaHubUrl and zonefile)
  */
-function nameImport(network: Object, args: Array<string>) {
+function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const IDrecipientAddr = args[1];
   const gaiaHubUrl = args[2];
   const importKey = decodePrivateKey(args[3]);
   let zonefilePath = args[4]
   let zonefileHash = args[5];
-  let zonefile = null;
+  let zonefile : string = '';
 
   if (safetyChecks && (typeof importKey !== 'string')) {
     // multisig import not supported, unless we're testing 
@@ -1544,7 +1601,7 @@ function nameImport(network: Object, args: Array<string>) {
     zonefileHash = hash160(Buffer.from(zonefile)).toString('hex');
   }
 
-  const namespaceID = name.split('.').slice(-1);
+  const namespaceID = name.split('.').slice(-1)[0];
   const importAddress = getPrivateKeyAddress(network, importKey);
 
   const txPromise = blockstack.transactions.makeNameImport(
@@ -1552,14 +1609,15 @@ function nameImport(network: Object, args: Array<string>) {
 
   const importUTXOsPromise = network.getUTXOs(importAddress);
 
-  const estimatePromise = importUTXOsPromise.then((utxos) => {
+  const estimatePromise = importUTXOsPromise.then((utxos : UTXO[]) => {
         const numUTXOs = utxos.length;
         return blockstack.transactions.estimateNameImport(
           name, recipientAddr, zonefileHash, numUTXOs);
       });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
  
   if (!safetyChecks) {
@@ -1568,10 +1626,10 @@ function nameImport(network: Object, args: Array<string>) {
     }
     else {
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return broadcastTransactionAndZoneFile(network, tx, zonefile)
         })
-        .then((resp) => {
+        .then((resp : any) => {
           if (resp.status && resp.hasOwnProperty('txid')) {
             // just return txid 
             return resp.txid;
@@ -1602,7 +1660,7 @@ function nameImport(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Name cannot be safetly imported',
           'isNamespaceReady': isNamespaceReady,
@@ -1610,14 +1668,14 @@ function nameImport(network: Object, args: Array<string>) {
           'addressCanReceiveName': addressCanReceive,
           'importBalanceBTC': importBalance,
           'estimateCostBTC': estimate
-        }, true);
+        };
       }
   });
 
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
@@ -1625,10 +1683,10 @@ function nameImport(network: Object, args: Array<string>) {
       }
 
       return txPromise
-        .then((tx) => {
+        .then((tx : string) => {
           return broadcastTransactionAndZoneFile(network, tx, zonefile)
         })
-        .then((resp) => {
+        .then((resp : any) => {
           if (resp.status && resp.hasOwnProperty('txid')) {
             // just return txid 
             return resp.txid;
@@ -1647,7 +1705,7 @@ function nameImport(network: Object, args: Array<string>) {
  * @messageHash (string) the hash of the already-sent message
  * @senderKey (string) the key that owns the name that the peers have subscribed to
  */
-function announce(network: Object, args: Array<string>) {
+function announce(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const messageHash = args[0];
   const senderKey = decodePrivateKey(args[1]);
 
@@ -1658,13 +1716,14 @@ function announce(network: Object, args: Array<string>) {
 
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
-  const estimatePromise = senderUTXOsPromise.then((utxos) => {
+  const estimatePromise = senderUTXOsPromise.then((utxos : UTXO[]) => {
     const numUTXOs = utxos.length;
     return blockstack.transactions.estimateAnnounce(messageHash, numUTXOs)
   });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
   
   if (!safetyChecks) {
@@ -1679,7 +1738,7 @@ function announce(network: Object, args: Array<string>) {
     }
   }
 
-  const senderBalancePromise = senderUTXOsPromise.then((utxos) => {
+  const senderBalancePromise = senderUTXOsPromise.then((utxos : UTXO[]) => {
     return sumUTXOs(utxos);
   });
 
@@ -1690,29 +1749,29 @@ function announce(network: Object, args: Array<string>) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'Announcement cannot be safely sent',
           'senderBalanceBTC': senderBalance,
           'estimateCostBTC': estimate
-        }, true);
+        };
       }
   });
 
   return safetyChecksPromise
-    .then((safetyChecksResult) => {
+    .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
 
       if (txOnly) {
         return txPromise;
       }
 
-      return txPromise.then((tx) => {
+      return txPromise.then((tx : string) => {
         return network.broadcastTransaction(tx);
       })
-      .then((txidHex) => {
+      .then((txidHex : string) => {
         return txidHex;
       });
     });
@@ -1731,7 +1790,7 @@ function announce(network: Object, args: Array<string>) {
  * @arg zonefile (string) OPTIONAL the path to the zone file to give this name.
  *  supercedes gaiaHubUrl
  */
-function register(network: Object, args: Array<string>) {
+function register(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -1739,9 +1798,9 @@ function register(network: Object, args: Array<string>) {
 
   const address = getPrivateKeyAddress(network, ownerKey);
   const mainnetAddress = network.coerceMainnetAddress(address)
-  const emptyProfile = {type: '@Person', account: []};
+  const emptyProfile : any = {type: '@Person', account: []};
 
-  let zonefilePromise = null;
+  let zonefilePromise : Promise<string>;
 
   if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
@@ -1754,25 +1813,23 @@ function register(network: Object, args: Array<string>) {
 
   let preorderTx = "";
   let registerTx = "";
-  let broadcastResult = null;
-  let zonefile = null;
+  let broadcastResult : any = null;
+  let zonefile : string = '';
 
-  return zonefilePromise.then((zf) => {
-
+  return zonefilePromise.then((zf : string) => {
     zonefile = zf;
 
     // carry out safety checks for preorder and register
     const preorderSafetyCheckPromise = txPreorder(
-      network, [name, `ID-${address}`, paymentKey], true);
+       network, [name, `ID-${address}`, args[2]], true);
 
     const registerSafetyCheckPromise = txRegister(
-      network, [name, `ID-${address}`, paymentKey, zf], true);
+      network, [name, `ID-${address}`, args[2], zf], true);
 
     return Promise.all([preorderSafetyCheckPromise, registerSafetyCheckPromise])
   })
-  .then(([preorderSafetyChecks, registerSafetyChecks]) => {
-    if ((preorderSafetyChecks.hasOwnProperty('status') && !preorderSafetyChecks.status) || 
-        (registerSafetyChecks.hasOwnProperty('status') && !registerSafetyChecks.status)) {
+ .then(([preorderSafetyChecks, registerSafetyChecks]) => {
+    if (!checkTxStatus(preorderSafetyChecks) || !checkTxStatus(registerSafetyChecks)) {
       // one or both safety checks failed 
       throw new SafetyError({
         'status': false,
@@ -1786,11 +1843,11 @@ function register(network: Object, args: Array<string>) {
     // since we have to use the right UTXOs)
     return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
   })
-  .then((rawTx) => {
+  .then((rawTx : string) => {
     preorderTx = rawTx;
     return rawTx;
   })
-  .then((rawTx) => {
+  .then((rawTx : string) => {
     // make it so that when we generate the NAME_REGISTRATION operation,
     // we consume the change output from the NAME_PREORDER.
     network.modifyUTXOSetFrom(rawTx);
@@ -1800,11 +1857,11 @@ function register(network: Object, args: Array<string>) {
     // now we can make the NAME_REGISTRATION 
     return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
   })
-  .then((rawTx) => {
+  .then((rawTx : string) => {
     registerTx = rawTx;
     return rawTx;
   })
-  .then((rawTx) => {
+  .then((rawTx : string) => {
     // make sure we don't double-spend the NAME_REGISTRATION before it is broadcasted
     network.modifyUTXOSetFrom(rawTx);
   })
@@ -1823,7 +1880,7 @@ function register(network: Object, args: Array<string>) {
       return network.broadcastNameRegistration(preorderTx, registerTx, zonefile);
     }
   })
-  .then((txResult) => {
+  .then((txResult : any) => {
     // sign and upload profile
     broadcastResult = txResult;
     const signedProfileData = makeProfileJWT(emptyProfile, ownerKey);
@@ -1842,7 +1899,7 @@ function register(network: Object, args: Array<string>) {
       'txInfo': broadcastResult
     });
   })
-  .catch((e) => {
+  .catch((e : Error) => {
     if (e.hasOwnProperty('safetyErrors')) {
       // safety error; return as JSON 
       return e.message;
@@ -1864,7 +1921,7 @@ function register(network: Object, args: Array<string>) {
  * @arg zonefile (string) OPTIONAL the path to the zone file to give this name.
  *  supercedes gaiaHubUrl
  */
-function registerAddr(network: Object, args: Array<string>) {
+function registerAddr(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -1903,15 +1960,14 @@ function registerAddr(network: Object, args: Array<string>) {
 
   // carry out safety checks for preorder and register 
   const preorderSafetyCheckPromise = txPreorder(
-    network, [name, `ID-${address}`, paymentKey], true);
+    network, [name, `ID-${address}`, args[2]], true);
 
   const registerSafetyCheckPromise = txRegister(
-    network, [name, `ID-${address}`, paymentKey, zonefile], true);
+    network, [name, `ID-${address}`, args[2], zonefile], true);
 
   return Promise.all([preorderSafetyCheckPromise, registerSafetyCheckPromise])
-    .then(([preorderSafetyChecks, registerSafetyChecks]) => {
-      if ((preorderSafetyChecks.hasOwnProperty('status') && !preorderSafetyChecks.status) || 
-          (registerSafetyChecks.hasOwnProperty('status') && !registerSafetyChecks.status)) {
+   .then(([preorderSafetyChecks, registerSafetyChecks]) => {
+      if (!checkTxStatus(preorderSafetyChecks) || !checkTxStatus(registerSafetyChecks)) {
         // one or both safety checks failed 
         throw new SafetyError({
           'status': false,
@@ -1925,11 +1981,11 @@ function registerAddr(network: Object, args: Array<string>) {
       // since we have to use the right UTXOs)
       return blockstack.transactions.makePreorder(name, address, paymentKey, !hasKeys(paymentKey));
     })
-    .then((rawTx) => {
+    .then((rawTx : string) => {
       preorderTx = rawTx;
       return rawTx;
     })
-    .then((rawTx) => {
+    .then((rawTx : string) => {
       // make it so that when we generate the NAME_REGISTRATION operation,
       // we consume the change output from the NAME_PREORDER.
       network.modifyUTXOSetFrom(rawTx);
@@ -1939,11 +1995,11 @@ function registerAddr(network: Object, args: Array<string>) {
       // now we can make the NAME_REGISTRATION 
       return blockstack.transactions.makeRegister(name, address, paymentKey, zonefile, null, !hasKeys(paymentKey));
     })
-    .then((rawTx) => {
+    .then((rawTx : string) => {
       registerTx = rawTx;
       return rawTx;
     })
-    .then((rawTx) => {
+    .then((rawTx : string) => {
       // make sure we don't double-spend the NAME_REGISTRATION before it is broadcasted
       network.modifyUTXOSetFrom(rawTx);
     })
@@ -1962,13 +2018,13 @@ function registerAddr(network: Object, args: Array<string>) {
         return network.broadcastNameRegistration(preorderTx, registerTx, zonefile);
       }
     })
-    .then((txResult) => {
+    .then((txResult : any) => {
       // succcess! 
       return JSONStringify({
         'txInfo': txResult
       });
     })
-    .catch((e) => {
+    .catch((e : Error) => {
       if (e.hasOwnProperty('safetyErrors')) {
         // safety error; return as JSON 
         return e.message;
@@ -1990,7 +2046,7 @@ function registerAddr(network: Object, args: Array<string>) {
  * @arg zonefile (string) OPTIONAL the path to the zone file to give this name.
  *  supercedes gaiaHubUrl
  */
-function registerSubdomain(network: Object, args: Array<string>) {
+function registerSubdomain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const gaiaHubUrl = args[2];
@@ -1998,11 +2054,11 @@ function registerSubdomain(network: Object, args: Array<string>) {
 
   const address = getPrivateKeyAddress(network, ownerKey);
   const mainnetAddress = network.coerceMainnetAddress(address)
-  const emptyProfile = {type: '@Person', account: []};
+  const emptyProfile : any = {type: '@Person', account: []};
   const onChainName = name.split('.').slice(-2).join('.');
   const subName = name.split('.')[0];
 
-  let zonefilePromise = null;
+  let zonefilePromise : Promise<string>;
 
   // TODO: fix this once the subdomain registrar will tell us the on-chain name
   logger.warn(`WARNING: not yet able to verify that ${registrarUrl} is the registrar ` +
@@ -2014,24 +2070,24 @@ function registerSubdomain(network: Object, args: Array<string>) {
   }
   else {
     // generate one 
-    zonefilePromise = makeZoneFileFromGaiaUrl(network, name, gaiaHubUrl, ownerKey);
+    zonefilePromise = makeZoneFileFromGaiaUrl(network, name, gaiaHubUrl, args[1]);
   }
 
-  let broadcastResult = null;
+  let broadcastResult : any = null;
   let api_key = process.env.API_KEY || null;
 
   const onChainNamePromise = getNameInfoEasy(network, onChainName);
   const registrarStatusPromise = fetch(`${registrarUrl}/index`)
-    .then((resp) => resp.json());
+    .then((resp : any) => resp.json());
 
   const profileUploadPromise = Promise.resolve().then(() => {
       // sign and upload profile
-      const signedProfileData = makeProfileJWT(emptyProfile, ownerKey);
+      const signedProfileData = makeProfileJWT(emptyProfile, args[1]);
       return gaiaUploadProfileAll(
-        network, [gaiaHubUrl], signedProfileData, ownerKey);
+        network, [gaiaHubUrl], signedProfileData, args[1]);
     })
-    .then((gaiaUrls) => {
-      if (gaiaUrls.hasOwnProperty('error')) {
+    .then((gaiaUrls : {dataUrls?: string[], error?: string}) => {
+       if (!!gaiaUrls.error) {
         return { profileUrls: null, error: gaiaUrls.error };
       }
       else {
@@ -2077,7 +2133,7 @@ function registerSubdomain(network: Object, args: Array<string>) {
   }
 
   return Promise.all([safetyChecksPromise, zonefilePromise])
-  .then(([safetyChecks, zonefile]) => {
+   .then(([safetyChecks, zonefile] : [any, string]) => {
     if (safetyChecks.status) {
       const request = {
         'zonefile': zonefile,
@@ -2102,7 +2158,7 @@ function registerSubdomain(network: Object, args: Array<string>) {
         .then(resp => resp.json())
 
       return Promise.all([registerPromise, profileUploadPromise])
-        .then(([registerInfo, profileUploadInfo]) => {
+        .then(([registerInfo, profileUploadInfo] : [any, any]) => {
           if (!profileUploadInfo.error) {
             return JSONStringify({
               'txInfo': registerInfo,
@@ -2127,11 +2183,11 @@ function registerSubdomain(network: Object, args: Array<string>) {
  * @path (string) path to the profile
  * @privateKey (string) the owner key (must be single-sig)
  */
-function profileSign(network: Object, args: Array<string>) {
+function profileSign(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const profilePath = args[0];
   const privateKey = decodePrivateKey(args[1]);
   const profileData = JSON.parse(fs.readFileSync(profilePath).toString());
-  return Promise.resolve().then(() => makeProfileJWT(profileData, privateKey));
+  return Promise.resolve().then(() => makeProfileJWT(profileData, args[1]));
 }
 
 /*
@@ -2139,7 +2195,7 @@ function profileSign(network: Object, args: Array<string>) {
  * @path (string) path to the profile
  * @publicKeyOrAddress (string) public key or address
  */
-function profileVerify(network: Object, args: Array<string>) {
+function profileVerify(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const profilePath = args[0];
   let publicKeyOrAddress = args[1];
 
@@ -2184,7 +2240,7 @@ function profileVerify(network: Object, args: Array<string>) {
  * @privateKey (string) owner private key for the name
  * @gaiaUrl (string) this is the write endpoint of the Gaia hub to use
  */
-function profileStore(network: Object, args: Array<string>) {
+function profileStore(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   let nameOrAddress = args[0];
   const signedProfilePath = args[1];
   const privateKey = decodePrivateKey(args[2]);
@@ -2195,8 +2251,8 @@ function profileStore(network: Object, args: Array<string>) {
   const ownerAddress = getPrivateKeyAddress(network, privateKey);
   let ownerAddressMainnet = network.coerceMainnetAddress(ownerAddress);
 
-  let nameInfoPromise = null;
-  let name;
+  let nameInfoPromise : Promise<{address: string}>;
+  let name : string = "";
 
   if (nameOrAddress.startsWith('ID-')) {
     // ID-address
@@ -2216,16 +2272,16 @@ function profileStore(network: Object, args: Array<string>) {
     [signedProfilePath, `ID-${ownerAddressMainnet}`]);
    
   return Promise.all([nameInfoPromise, verifyProfilePromise])
-    .then(([nameInfo, verifiedProfile]) => {
+    .then(([nameInfo, verifiedProfile] : [NameInfoType, any]) => {
       if (safetyChecks && (!nameInfo ||
           network.coerceAddress(nameInfo.address) !== network.coerceAddress(ownerAddress))) {
         throw new Error(`Name owner address either could not be found, or does not match ` +
           `private key address ${ownerAddress}`);
       }
       return gaiaUploadProfileAll(
-        network, [gaiaHubUrl], signedProfileData, privateKey, name);
+        network, [gaiaHubUrl], signedProfileData, args[2], name);
     })
-    .then((gaiaUrls) => {
+    .then((gaiaUrls : {dataUrls?: string[], error?: string}) => {
       if (gaiaUrls.hasOwnProperty('error')) {
         return JSONStringify(gaiaUrls, true);
       }
@@ -2239,7 +2295,7 @@ function profileStore(network: Object, args: Array<string>) {
  * Push a zonefile to the Atlas network
  * @zonefileDataOrPath (string) the zonefile data to push, or the path to the data
  */
-function zonefilePush(network: Object, args: Array<string>) {
+function zonefilePush(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const zonefileDataOrPath = args[0];
   let zonefileData = null;
 
@@ -2250,7 +2306,7 @@ function zonefilePush(network: Object, args: Array<string>) {
   }
 
   return network.broadcastZoneFile(zonefileData)
-    .then((result) => {
+    .then((result : any) => {
       return JSONStringify(result);
     });
 }
@@ -2262,16 +2318,16 @@ function zonefilePush(network: Object, args: Array<string>) {
  * @nameOrIDAddress (string) the name or ID-address
  * @appOrigin (string) the application's origin URL
  */
-function getAppKeys(network: Object, args: Array<string>) {
+function getAppKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const mnemonicPromise = getBackupPhrase(args[0]);
   const nameOrIDAddress = args[1];
   const origin = args[2];
-  let idAddress
-  return getIDAddress(network, nameOrIDAddress).then((idAddr) => {
+  let idAddress : string;
+  return getIDAddress(network, nameOrIDAddress).then((idAddr : string) => {
       idAddress = idAddr;
       return mnemonicPromise;
     })
-    .then((mnemonic) => JSONStringify(
+    .then((mnemonic : string) => JSONStringify(
       getApplicationKeyInfo(network, mnemonic, idAddress, origin)));
 }
 
@@ -2281,14 +2337,14 @@ function getAppKeys(network: Object, args: Array<string>) {
  * @mnemonic (string) the 12-word phrase
  * @max_index (integer) (optional) the profile index maximum
  */
-function getOwnerKeys(network: Object, args: Array<string>) {
+function getOwnerKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const mnemonicPromise = getBackupPhrase(args[0]);
   let maxIndex = 1;
   if (args.length > 1 && !!args[1]) {
     maxIndex = parseInt(args[1]);
   }
 
-  return mnemonicPromise.then((mnemonic) => {
+  return mnemonicPromise.then((mnemonic : string) => {
     let keyInfo = [];
     for (let i = 0; i < maxIndex; i++) {
       keyInfo.push(getOwnerKeyInfo(network, mnemonic, i));
@@ -2303,10 +2359,10 @@ function getOwnerKeys(network: Object, args: Array<string>) {
  * args:
  * @mnemonic (string) the 12-word phrase
  */
-function getPaymentKey(network: Object, args: Array<string>) {
+function getPaymentKey(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const mnemonicPromise = getBackupPhrase(args[0]);
   
-  return mnemonicPromise.then((mnemonic) => {
+  return mnemonicPromise.then((mnemonic : string) => {
     // keep the return value consistent with getOwnerKeys 
     const keyObj = getPaymentKeyInfo(network, mnemonic);
     const keyInfo = [];
@@ -2320,11 +2376,11 @@ function getPaymentKey(network: Object, args: Array<string>) {
  * args:
  * @mnemonic (string) OPTIONAL; the 12-word phrase
  */
-function makeKeychain(network: Object, args: Array<string>) {
+function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const mnemonicPromise = (args[0] ? getBackupPhrase(args[0]) : 
     Promise.resolve().then(() => bip39.generateMnemonic(STRENGTH, crypto.randomBytes)));
 
-  return mnemonicPromise.then((mnemonic) => {
+  return mnemonicPromise.then((mnemonic : string) => {
     const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, 0);
     const paymentKeyInfo = getPaymentKeyInfo(network, mnemonic);
     return JSONStringify({
@@ -2341,7 +2397,7 @@ function makeKeychain(network: Object, args: Array<string>) {
  * args:
  * @address (string) the address
  */
-function balance(network: Object, args: Array<string>) {
+function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   let address = args[0];
   if (address.match(STACKS_ADDRESS_PATTERN)) {
     address = c32check.c32ToB58(address);
@@ -2355,7 +2411,7 @@ function balance(network: Object, args: Array<string>) {
   return Promise.resolve().then(() => {
     return network.getAccountTokens(address);
   })
-  .then((tokenList) => {
+  .then((tokenList : { tokens: string[] }) => {
     let tokenAndBTC = tokenList.tokens;
     if (!tokenAndBTC) {
       tokenAndBTC = [];
@@ -2363,12 +2419,12 @@ function balance(network: Object, args: Array<string>) {
 
     tokenAndBTC.push('BTC');
 
-    return Promise.all(tokenAndBTC.map((tokenType) => {
+    return Promise.all(tokenAndBTC.map((tokenType : string) => {
       if (tokenType === 'BTC') {
         return Promise.resolve().then(() => {
           return network.getUTXOs(address);
         })
-        .then((utxoList) => {
+        .then((utxoList : UTXO[]) => {
           return {
             'token': 'BTC',
             'amount': `${sumUTXOs(utxoList)}`
@@ -2379,7 +2435,7 @@ function balance(network: Object, args: Array<string>) {
         return Promise.resolve().then(() => {
           return network.getAccountBalance(address, tokenType)
         })
-        .then((tokenBalance) => {
+        .then((tokenBalance : BN) => {
           return {
             'token': tokenType,
             'amount': tokenBalance.toString()
@@ -2388,10 +2444,10 @@ function balance(network: Object, args: Array<string>) {
       }
     }));
   })
-  .then((tokenBalances) => {
-    let ret = {};
+  .then((tokenBalances : [{token: string, amount: string}]) => {
+    let ret : Record<string, string> = {};
     for (let tokenInfo of tokenBalances) {
-      ret[tokenInfo.token] = tokenInfo.amount;
+       ret[tokenInfo.token] = tokenInfo.amount;
     }
     return JSONStringify(ret);
   });
@@ -2403,7 +2459,7 @@ function balance(network: Object, args: Array<string>) {
  * @address (string) the account address
  * @page (int) the page of the history to fetch (optional)
  */
-function getAccountHistory(network: Object, args: Array<string>) {
+function getAccountHistory(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const address = c32check.c32ToB58(args[0]);
 
   if (args.length >= 2 && !!args[1]) {
@@ -2411,21 +2467,23 @@ function getAccountHistory(network: Object, args: Array<string>) {
     return Promise.resolve().then(() => {
       return network.getAccountHistoryPage(address, page);
     })
-    .then(accountStates => JSONStringify(accountStates.map((s) => {
-      s.address = c32check.b58ToC32(s.address);
-      s.credit_value = s.credit_value.toString();
-      s.debit_value = s.debit_value.toString();
-      return s;
+    .then(accountStates => JSONStringify(accountStates.map((s : any) => {
+      const new_s = {
+         address: c32check.b58ToC32(s.address),
+         credit_value: s.credit_value.toString(),
+         debit_value: s.debit_value.toString()
+      };
+      return new_s;
     })));
   }
   else {
     // all pages 
-    let history = [];
+    let history : any[] = [];
     
-    function getAllAccountHistoryPages(page: number) {
+    function getAllAccountHistoryPages(page: number) : Promise<any[]> {
       return network.getAccountHistoryPage(address, page)
-        .then((results) => {
-          if (Object.keys(results).length == 0) {
+        .then((results : any[]) => {
+          if (results.length == 0) {
             return history;
           }
           else {
@@ -2436,11 +2494,13 @@ function getAccountHistory(network: Object, args: Array<string>) {
     }
 
     return getAllAccountHistoryPages(0)
-      .then(accountStates => JSONStringify(accountStates.map((s) => {
-        s.address = c32check.b58ToC32(s.address);
-        s.credit_value = s.credit_value.toString();
-        s.debit_value = s.debit_value.toString();
-        return s;
+     .then((accountStates: any[]) => JSONStringify(accountStates.map((s : any) => {
+         const new_s = {
+            address: c32check.b58ToC32(s.address),
+            credit_value: s.credit_value.toString(),
+            debit_value: s.debit_value.toString()
+         };
+         return new_s;
       })));
   }
 }
@@ -2451,19 +2511,21 @@ function getAccountHistory(network: Object, args: Array<string>) {
  * @address (string) the account address
  * @blockHeight (int) the height at which to query
  */
-function getAccountAt(network: Object, args: Array<string>) {
+function getAccountAt(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const address = c32check.c32ToB58(args[0]);
   const blockHeight = parseInt(args[1]);
 
   return Promise.resolve().then(() => {
     return network.getAccountAt(address, blockHeight);
   })
-  .then(accountStates => accountStates.map((s) => {
-    s.address = c32check.b58ToC32(s.address);
-    s.credit_value = s.credit_value.toString();
-    s.debit_value = s.debit_value.toString();
-    return s;
-  }))
+ .then(accountStates => accountStates.map((s : any) => {
+    let new_s = {
+       address: c32check.b58ToC32(s.address),
+       credit_value: s.credit_value.toString(),
+       debit_value: s.debit_value.toString()
+    };
+    return new_s;
+   }))
   .then(history => JSONStringify(history));
 }
 
@@ -2474,7 +2536,7 @@ function getAccountAt(network: Object, args: Array<string>) {
  * @amount (string) the amount of BTC to send
  * @privateKey (string) the private key that owns the BTC
  */
-function sendBTC(network: Object, args: Array<string>) {
+function sendBTC(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const destinationAddress = args[0]
   const amount = parseInt(args[1])
   const paymentKeyHex = decodePrivateKey(args[2]);
@@ -2493,8 +2555,8 @@ function sendBTC(network: Object, args: Array<string>) {
     paymentKey = paymentKeyHex;
   }
 
-  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount, !hasKeys(paymentKey))
-    .catch((e) => {
+  const txPromise = blockstack.transactions.makeBitcoinSpend(destinationAddress, paymentKey, amount, !hasKeys(paymentKeyHex))
+    .catch((e : Error) => {
       if (e.name === 'InvalidAmountError') {
         return JSONStringify({
           'status': false,
@@ -2510,10 +2572,10 @@ function sendBTC(network: Object, args: Array<string>) {
     return txPromise;
   }
   else {
-    return txPromise.then((tx) => {
+    return txPromise.then((tx : string) => {
       return network.broadcastTransaction(tx);
     })
-    .then((txid) => {
+    .then((txid : string) => {
       return txid;
     });
   }
@@ -2527,24 +2589,26 @@ function sendBTC(network: Object, args: Array<string>) {
  * @tokenType (string) the type of tokens to send
  * @tokenAmount (int) the number of tokens to send
  * @privateKey (string) the hex-encoded private key to use to send the tokens
+ * @privateKeyBTC (string) the hex-encoded private key to use to fund the BTC fee
  * @memo (string) OPTIONAL: a 34-byte memo to include
  */
-function sendTokens(network: Object, args: Array<string>) {
+function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const recipientAddress = c32check.c32ToB58(args[0]);
   const tokenType = args[1];
-  const tokenAmount = bigi.fromByteArrayUnsigned(args[2]);
+  const tokenAmount = new BN(args[2]);
   const privateKey = decodePrivateKey(args[3]);
+  const privateKeyBTC = decodePrivateKey(args[4]);
   let memo = "";
 
-  if (args.length > 4 && !!args[4]) {
-    memo = args[4];
+  if (args.length > 4 && !!args[5]) {
+    memo = args[5];
   }
 
   const senderAddress = getPrivateKeyAddress(network, privateKey);
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
   const txPromise = blockstack.transactions.makeTokenTransfer(
-    recipientAddress, tokenType, tokenAmount, memo, privateKey, !hasKeys(privateKey));
+    recipientAddress, tokenType, tokenAmount, memo, privateKey, privateKeyBTC, !hasKeys(privateKey));
 
   const estimatePromise = senderUTXOsPromise.then((utxos) => {
     const numUTXOs = utxos.length;
@@ -2553,7 +2617,8 @@ function sendTokens(network: Object, args: Array<string>) {
   });
 
   if (estimateOnly) {
-    return estimatePromise;
+    return estimatePromise
+        .then((cost: number) => String(cost));
   }
 
   if (!safetyChecks) {
@@ -2580,12 +2645,12 @@ function sendTokens(network: Object, args: Array<string>) {
       accountStatePromise, blockHeightPromise])
     .then(([tokenBalance, estimate, btcBalance, 
       accountState, blockHeight]) => {
-      if (btcBalance >= estimate && tokenBalance.compareTo(tokenAmount) >= 0 &&
+      if (btcBalance >= estimate && tokenBalance.cmp(tokenAmount) >= 0 &&
           accountState.lock_transfer_block_id <= blockHeight) {
         return {'status': true};
       }
       else {
-        return JSONStringify({
+        return {
           'status': false,
           'error': 'TokenTransfer cannot be safely sent',
           'lockTransferBlockHeight': accountState.lock_transfer_block_id,
@@ -2593,14 +2658,14 @@ function sendTokens(network: Object, args: Array<string>) {
           'estimateCostBTC': estimate,
           'tokenBalance': tokenBalance.toString(),
           'blockHeight': blockHeight,
-        }, true);
+        };
       }
   });
 
   return safetyChecksPromise
     .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(safetyChecksResult));
+        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
       }
       
       if (txOnly) {
@@ -2621,7 +2686,7 @@ function sendTokens(network: Object, args: Array<string>) {
  * args:
  * @txid (string) the transaction ID as a hex string
  */
-function getConfirmations(network: Object, args: Array<string>) {
+function getConfirmations(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const txid = args[0];
   return Promise.all([network.getBlockHeight(), network.getTransactionInfo(txid)])
     .then(([blockHeight, txInfo]) => {
@@ -2648,7 +2713,7 @@ function getConfirmations(network: Object, args: Array<string>) {
  * args:
  * @private_key (string) the hex-encoded private key or key bundle
  */
-function getKeyAddress(network: Object, args: Array<string>) {
+function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const privateKey = decodePrivateKey(args[0]);
   return Promise.resolve().then(() => {
     const addr = getPrivateKeyAddress(network, privateKey);
@@ -2671,7 +2736,7 @@ function getKeyAddress(network: Object, args: Array<string>) {
  * @verify (string) OPTIONAL: if '1' or 'true', then search for and verify a signature file
  *  along with the data
  */
-function gaiaGetFile(network: Object, args: Array<string>) {
+function gaiaGetFile(network: CLINetworkAdapter, args: string[]) : Promise<string | Buffer> {
   const username = args[0];
   const origin = args[1];
   const path = args[2];
@@ -2694,13 +2759,13 @@ function gaiaGetFile(network: Object, args: Array<string>) {
 
   // force mainnet addresses 
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
-  return gaiaAuth(appPrivateKey, null)
-    .then((userData) => blockstack.getFile(path, {
+  return gaiaAuth(network, appPrivateKey, null)
+    .then((userData : UserData) => blockstack.getFile(path, {
         decrypt: decrypt,
         verify: verify,
         app: origin,
         username: username}))
-    .then((data) => {
+    .then((data: ArrayBuffer | Buffer | string) => {
       if (data instanceof ArrayBuffer) {
         return Buffer.from(data);
       }
@@ -2720,7 +2785,7 @@ function gaiaGetFile(network: Object, args: Array<string>) {
  * @encrypt (string) OPTIONAL: if '1' or 'true', then encrypt the file
  * @sign (string) OPTIONAL: if '1' or 'true', then sign the file and store the signature too.
  */
-function gaiaPutFile(network: Object, args: Array<string>) {
+function gaiaPutFile(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const hubUrl = args[0];
   const appPrivateKey = args[1];
   const dataPath = args[2];
@@ -2738,14 +2803,15 @@ function gaiaPutFile(network: Object, args: Array<string>) {
   
   const data = fs.readFileSync(dataPath);
 
-  // force mainnet addresses 
+  // force mainnet addresses
+  // TODO
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
-  return gaiaAuth(appPrivateKey, hubUrl)
-    .then((userData) => {      
+  return gaiaAuth(network, appPrivateKey, hubUrl)
+    .then((userData : UserData) => {      
       return blockstack.putFile(gaiaPath, data, { encrypt: encrypt, sign: sign });
     })
-    .then((urls) => {
-      return JSONStringify({'urls': urls})
+    .then((url : string) => {
+      return JSONStringify({'urls': [url]})
     });
 }
 
@@ -2756,26 +2822,31 @@ function gaiaPutFile(network: Object, args: Array<string>) {
  * @hubUrl (string) the URL to the write endpoint of the gaia hub
  * @appPrivateKey (string) the private key used to authenticate to the gaia hub
  */
-function gaiaListFiles(network: Object, args: Array<string>) {
+function gaiaListFiles(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const hubUrl = args[0];
   const appPrivateKey = args[1];
-
-  // force mainnet addresses 
+   
+  // force mainnet addresses
+  // TODO
+  let count = 0;
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
-  return gaiaAuth(canonicalPrivateKey(appPrivateKey), hubUrl)
-    .then((userData) => {
-      return blockstack.listFiles((name) => {
+  return gaiaAuth(network, canonicalPrivateKey(appPrivateKey), hubUrl)
+    .then((userData : UserData) => {
+       return blockstack.listFiles((name : string) => {
+        // print out incrementally
         console.log(name);
+        count += 1;
         return true;
       });
-    });
+    })
+   .then(() => JSONStringify(count));
 }
 
 
 /*
  * Group array items into batches
  */
-function batchify<T>(input: Array<T>, batchSize: number = 50): Array<Array<T>> {
+function batchify<T>(input: T[], batchSize: number = 50): T[][] {
   const output = []
   let currentBatch = []
   for (let i = 0; i < input.length; i++) {
@@ -2800,7 +2871,7 @@ function batchify<T>(input: Array<T>, batchSize: number = 50): Array<Array<T>> {
  * @mnemonic (string) the 12-word phrase or ciphertext
  * @dumpDir (string) the directory to hold the dumped files
  */
-function gaiaDumpBucket(network: Object, args: Array<string>) {
+function gaiaDumpBucket(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const nameOrIDAddress = args[0];
   const appOrigin = args[1];
   const hubUrl = args[2];
@@ -2812,20 +2883,20 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
   }
   if (dumpDir[0] !== '/') {
     // relative path.  make absolute 
-    const cwd = process.realpathSync('.');
+    const cwd = fs.realpathSync('.');
     dumpDir = pathTools.normalize(`${cwd}/${dumpDir}`);
   }
 
   mkdirs(dumpDir);
 
-  function downloadFile(hubConfig: Object, fileName: string) : Promise<*> {
+  function downloadFile(hubConfig: GaiaHubConfig, fileName: string) : Promise<any> {
     const gaiaReadUrl = `${hubConfig.url_prefix.replace(/\/+$/, '')}/${hubConfig.address}`;
     const fileUrl = `${gaiaReadUrl}/${fileName}`;
     const destPath = `${dumpDir}/${fileName.replace(/\//g, '\\x2f')}`;
     
     console.log(`Download ${fileUrl} to ${destPath}`);
     return fetch(fileUrl)
-      .then((resp) => {
+      .then((resp : any) => {
         if (resp.status !== 200) {
           throw new Error(`Bad status code for ${fileUrl}: ${resp.status}`);
         }
@@ -2840,7 +2911,7 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
           return resp.arrayBuffer()
         }
       })
-      .then((filebytes) => {
+      .then((filebytes : Buffer | ArrayBuffer) => {
         return new Promise((resolve, reject) => {
           try {
             fs.writeFileSync(destPath, Buffer.from(filebytes), { encoding: null, mode: 0o660 });
@@ -2853,43 +2924,44 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
       });
   }
 
-  // force mainnet addresses
+   // force mainnet addresses
+   // TODO: better way of doing this
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
 
-  const fileNames = [];
-  let gaiaHubConfig;
-  let mnemonic;
-  let appPrivateKey;
-  let ownerPrivateKey;
+  const fileNames: string[] = [];
+  let gaiaHubConfig : GaiaHubConfig;
+  let mnemonic : string;
+  let appPrivateKey : string;
+  let ownerPrivateKey : string;
 
   return getIDAppKeys(network, nameOrIDAddress, appOrigin, mnemonicOrCiphertext)
-    .then((keyInfo) => {
+    .then((keyInfo : IDAppKeys) => {
       mnemonic = keyInfo.mnemonic;
       appPrivateKey = keyInfo.appPrivateKey;
       ownerPrivateKey = keyInfo.ownerPrivateKey;
-      return gaiaAuth(appPrivateKey, hubUrl, ownerPrivateKey);
+      return gaiaAuth(network, appPrivateKey, hubUrl, ownerPrivateKey);
     })
-    .then((userData) => {
+    .then((userData : UserData) => {
       return gaiaConnect(network, hubUrl, appPrivateKey);
     })
-    .then((hubConfig) => {
+    .then((hubConfig : GaiaHubConfig) => {
       gaiaHubConfig = hubConfig;
       return blockstack.listFiles((name) => {
         fileNames.push(name);
         return true;
       });
     })
-    .then((fileCount) => {
+    .then((fileCount : number) => {
       console.log(`Download ${fileCount} files...`);
-      const fileBatches = batchify(fileNames);
-      let filePromiseChain = Promise.resolve();
+      const fileBatches : string[][] = batchify(fileNames);
+      let filePromiseChain : Promise<any> = Promise.resolve();
       for (let i = 0; i < fileBatches.length; i++) {
         const filePromises = fileBatches[i].map((fileName) => downloadFile(gaiaHubConfig, fileName));
         const batchPromise = Promise.all(filePromises);
         filePromiseChain = filePromiseChain.then(() => batchPromise);
       }
 
-      return filePromiseChain.then(() => fileCount);
+      return filePromiseChain.then(() => JSONStringify(fileCount));
     });
 }
 
@@ -2902,7 +2974,7 @@ function gaiaDumpBucket(network: Object, args: Array<string>) {
  * @mnemonic (string) the 12-word phrase or ciphertext
  * @dumpDir (string) the directory to hold the dumped files
  */
-function gaiaRestoreBucket(network: Object, args: Array<string>) {
+function gaiaRestoreBucket(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const nameOrIDAddress = args[0];
   const appOrigin = args[1];
   const hubUrl = args[2];
@@ -2914,37 +2986,38 @@ function gaiaRestoreBucket(network: Object, args: Array<string>) {
   }
   if (dumpDir[0] !== '/') {
     // relative path.  make absolute 
-    const cwd = process.realpathSync('.');
+    const cwd = fs.realpathSync('.');
     dumpDir = pathTools.normalize(`${cwd}/${dumpDir}`);
   }
 
   const fileList = fs.readdirSync(dumpDir);
   const fileBatches = batchify(fileList, 10);
 
-  let gaiaHubConfig;
-  let mnemonic;
-  let appPrivateKey;
-  let ownerPrivateKey;
+  let gaiaHubConfig : GaiaHubConfig;
+  let mnemonic : string;
+  let appPrivateKey : string;
+  let ownerPrivateKey : string;
   
-  // force mainnet addresses 
+   // force mainnet addresses
+   // TODO better way of doing this
   blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
 
   return getIDAppKeys(network, nameOrIDAddress, appOrigin, mnemonicOrCiphertext)
-    .then((keyInfo) => {
+    .then((keyInfo : IDAppKeys) => {
       mnemonic = keyInfo.mnemonic;
       appPrivateKey = keyInfo.appPrivateKey;
       ownerPrivateKey = keyInfo.ownerPrivateKey;
-      return gaiaAuth(appPrivateKey, hubUrl, ownerPrivateKey);
+      return gaiaAuth(network, appPrivateKey, hubUrl, ownerPrivateKey);
     })
-    .then((userData) => {
-      let uploadPromise = Promise.resolve();
+    .then((userData : UserData) => {
+      let uploadPromise : Promise<any> = Promise.resolve();
       for (let i = 0; i < fileBatches.length; i++) {
-        const uploadBatchPromises = fileBatches[i].map((fileName) => {
+        const uploadBatchPromises = fileBatches[i].map((fileName : string) => {
           const filePath = pathTools.join(dumpDir, fileName);
           const dataBuf = fs.readFileSync(filePath);
           const gaiaPath = fileName.replace(/\\x2f/g, '/');
           return blockstack.putFile(gaiaPath, dataBuf, { encrypt: false, sign: false })
-            .then(url => {
+            .then((url : string) => {
               console.log(`Uploaded ${fileName} to ${url}`);
             });
         });
@@ -2964,7 +3037,7 @@ function gaiaRestoreBucket(network: Object, args: Array<string>) {
  * @hubUrl (string) the URL to the write endpoint of the app's gaia hub
  * @mnemonic (string) the 12-word backup phrase, or the ciphertext of it
  */
-function gaiaSetHub(network: Object, args: Array<string>) {
+function gaiaSetHub(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   network.setCoerceMainnetAddress(true);
 
   const blockstackID = args[0];
@@ -2974,7 +3047,7 @@ function gaiaSetHub(network: Object, args: Array<string>) {
   const mnemonicPromise = getBackupPhrase(args[4]);
 
   const nameInfoPromise = getNameInfoEasy(network, blockstackID)
-    .then((nameInfo) => {
+    .then((nameInfo : NameInfoType) => {
       if (!nameInfo) {
         throw new Error('Name not found');
       }
@@ -2983,12 +3056,12 @@ function gaiaSetHub(network: Object, args: Array<string>) {
 
   const profilePromise = blockstack.lookupProfile(blockstackID);
 
-  let profile;
-  let ownerPrivateKey;
-  let appAddress;
+  let profile : any;
+  let ownerPrivateKey : string;
+  let appAddress : string;
 
   return Promise.all([nameInfoPromise, profilePromise, mnemonicPromise])
-    .then(([nameInfo, nameProfile, mnemonic]) => {
+    .then(([nameInfo, nameProfile, mnemonic] : [NameInfoType, any, string]) => {
       if (!nameProfile) {
         throw new Error("No profile found");
       }
@@ -3012,8 +3085,8 @@ function gaiaSetHub(network: Object, args: Array<string>) {
       const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, appKeyInfo.ownerKeyIndex);
 
       // do we already have an address set for this app?
-      let existingAppAddress;
-      let appPrivateKey;
+      let existingAppAddress : string;
+      let appPrivateKey : string;
       try {
         existingAppAddress = getGaiaAddressFromProfile(network, nameProfile, appOrigin);
         appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
@@ -3038,7 +3111,7 @@ function gaiaSetHub(network: Object, args: Array<string>) {
 
       return Promise.all([ownerGaiaHubPromise, appGaiaHubPromise]);
     })
-    .then(([ownerHubConfig, appHubConfig]) => {
+    .then(([ownerHubConfig, appHubConfig] : [GaiaHubConfig, GaiaHubConfig]) => {
       if (!ownerHubConfig.url_prefix) {
         throw new Error('Invalid owner hub config: no url_prefix defined');
       }
@@ -3049,7 +3122,7 @@ function gaiaSetHub(network: Object, args: Array<string>) {
 
       const gaiaReadUrl = appHubConfig.url_prefix.replace(/\/+$/, '');
 
-      const newAppEntry = {};
+      const newAppEntry : Record<string, string> = {};
       newAppEntry[appOrigin] = `${gaiaReadUrl}/${appAddress}/`;
 
       const apps = Object.assign({}, profile.apps ? profile.apps : {}, newAppEntry)
@@ -3060,10 +3133,17 @@ function gaiaSetHub(network: Object, args: Array<string>) {
       return gaiaUploadProfileAll(
         network, [ownerHubUrl], signedProfile, ownerPrivateKey, blockstackID);
     })
-    .then((profileUrls) => {
-      return JSONStringify({
-        'profileUrls': profileUrls
-      });
+    .then((profileUrls : {dataUrls?: string[], error?: string}) => {
+       if (profileUrls.error) {
+          return JSONStringify({
+             error: profileUrls.error
+          });
+       }
+       else {
+          return JSONStringify({
+             profileUrls: profileUrls.dataUrls
+          });
+       }
     });
 }
       
@@ -3074,14 +3154,14 @@ function gaiaSetHub(network: Object, args: Array<string>) {
  * args:
  * @address (string) the input address.  can be in any format
  */
-function addressConvert(network: Object, args: Array<string>) {
+function addressConvert(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const addr = args[0];
-  let hash160String;
-  let version;
-  let b58addr;
-  let c32addr;
-  let testnetb58addr;
-  let testnetc32addr;
+  let hash160String : string;
+  let version : number;
+  let b58addr : string;
+  let c32addr : string;
+  let testnetb58addr : string;
+  let testnetc32addr : string;
 
   if (addr.match(STACKS_ADDRESS_PATTERN)) {
     c32addr = addr;
@@ -3101,7 +3181,7 @@ function addressConvert(network: Object, args: Array<string>) {
   }
 
   return Promise.resolve().then(() => {
-    let result = {
+    let result : any = {
       mainnet: {
         STACKS: c32addr, 
         BTC: b58addr
@@ -3130,10 +3210,10 @@ function addressConvert(network: Object, args: Array<string>) {
  *   will be stored (optional)
  * @port (number) the port to listen on (optional)
  */
-function authDaemon(network: Object, args: Array<string>) {
+function authDaemon(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const gaiaHubUrl = args[0];
   const mnemonicOrCiphertext = args[1];
-  let port = 8888;  // default port
+  let port = 3000;  // default port
   let profileGaiaHub = gaiaHubUrl;
 
   if (args.length > 2 && !!args[2]) {
@@ -3145,31 +3225,31 @@ function authDaemon(network: Object, args: Array<string>) {
   }
 
   if (port < 0 || port > 65535) {
-    return JSONStringify({ error: 'Invalid port' });
+     return Promise.resolve().then(() => JSONStringify({ error: 'Invalid port' }));
   }
 
   const mnemonicPromise = getBackupPhrase(mnemonicOrCiphertext);
 
   return mnemonicPromise
-    .then((mnemonic) => {
+    .then((mnemonic : string) => {
       noExit = true;
 
       // load up all of our identity addresses, profiles, profile URLs, and Gaia connections
       const authServer = express();
       authServer.use(cors())
 
-      authServer.get(/^\/auth\/*$/, (req: express.request, res: express.response) => {
+      authServer.get(/^\/auth\/*$/, (req: express.Request, res: express.Response) => {
         return handleAuth(network, mnemonic, gaiaHubUrl, profileGaiaHub, port, req, res);
       });
 
-      authServer.get(/^\/signin\/*$/, (req: express.request, res: express.response) => {
+      authServer.get(/^\/signin\/*$/, (req: express.Request, res: express.Response) => {
         return handleSignIn(network, mnemonic, gaiaHubUrl, profileGaiaHub, req, res);
       });
 
       authServer.listen(port, () => console.log(`Authentication server started on ${port}`));
       return 'Press Ctrl+C to exit';
     })
-    .catch((e) => {
+    .catch((e : Error) => {
       return JSONStringify({ error: e.message });
     });
 }
@@ -3180,14 +3260,14 @@ function authDaemon(network: Object, args: Array<string>) {
  * @backup_phrase (string) the 12-word phrase to encrypt
  * @password (string) the password (will be interactively prompted if not given)
  */
-function encryptMnemonic(network: Object, args: Array<string>) {
+function encryptMnemonic(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const mnemonic = args[0];
   if (mnemonic.split(/ +/g).length !== 12) {
     throw new Error('Invalid backup phrase: must be 12 words');
   }
 
   const passwordPromise = new Promise((resolve, reject) => {
-    let pass = '';
+    let pass : string = '';
     if (args.length === 2 && !!args[1]) {
       pass = args[1];
       resolve(pass);
@@ -3200,8 +3280,8 @@ function encryptMnemonic(network: Object, args: Array<string>) {
       }
       else {
         // prompt password
-        getpass('Enter password: ', (pass1) => {
-          getpass('Enter password again: ', (pass2) => {
+        getpass('Enter password: ', (pass1 : string) => {
+          getpass('Enter password again: ', (pass2 : string) => {
             if (pass1 !== pass2) {
               const errMsg = 'Passwords do not match';
               reject(new Error(errMsg));
@@ -3216,9 +3296,9 @@ function encryptMnemonic(network: Object, args: Array<string>) {
   });
 
   return passwordPromise
-    .then((pass) => encryptBackupPhrase(new Buffer(mnemonic), pass))
-    .then((cipherTextBuffer) => cipherTextBuffer.toString('base64'))
-    .catch((e) => {
+    .then((pass : string) => encryptBackupPhrase(mnemonic, pass))
+    .then((cipherTextBuffer : Buffer) => cipherTextBuffer.toString('base64'))
+    .catch((e : Error) => {
       return JSONStringify({ error: e.message});
     });
 }
@@ -3228,7 +3308,7 @@ function encryptMnemonic(network: Object, args: Array<string>) {
  * @encrypted_backup_phrase (string) the encrypted base64-encoded backup phrase
  * @password 9string) the password (will be interactively prompted if not given)
  */
-function decryptMnemonic(network: Object, args: Array<string>) {
+function decryptMnemonic(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const ciphertext = args[0];
  
   const passwordPromise = new Promise((resolve, reject) => {
@@ -3251,8 +3331,8 @@ function decryptMnemonic(network: Object, args: Array<string>) {
   });
 
   return passwordPromise
-    .then((pass) => decryptBackupPhrase(Buffer.from(ciphertext, 'base64'), pass))
-    .catch((e) => {
+    .then((pass : string) => decryptBackupPhrase(Buffer.from(ciphertext, 'base64'), pass))
+    .catch((e : Error) => {
       return JSONStringify({ error: `Failed to decrypt (wrong password or corrupt ciphertext), ` +
         `details: ${e.message}` });
     });
@@ -3260,13 +3340,27 @@ function decryptMnemonic(network: Object, args: Array<string>) {
 
 /* Print out all documentation on usage in JSON 
  */
-function printDocs(network: Object, args: Array<string>) {
+interface DocsArgsType {
+   name: string;
+   type: string;
+   value: string;
+   format: string;
+}
+
+interface FormattedDocsType {
+   command: string;
+   args: DocsArgsType[];
+   usage: string;
+   group: string
+}
+
+function printDocs(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   return Promise.resolve().then(() => {
-    const formattedDocs = [];
-    const commandNames = Object.keys(CLI_ARGS.properties);
+    const formattedDocs : FormattedDocsType[] = [];
+    const commandNames : string[] = Object.keys(CLI_ARGS.properties);
     for (let i = 0; i < commandNames.length; i++) {
       const commandName = commandNames[i];
-      const args = [];
+      const args : DocsArgsType[] = [];
       const usage = CLI_ARGS.properties[commandName].help;
       const group = CLI_ARGS.properties[commandName].group;
 
@@ -3277,7 +3371,7 @@ function printDocs(network: Object, args: Array<string>) {
           type: argItem.type,
           value: argItem.realtype,
           format: argItem.pattern ? argItem.pattern : '.+'
-        });
+        } as DocsArgsType);
       }
 
       formattedDocs.push({
@@ -3285,7 +3379,7 @@ function printDocs(network: Object, args: Array<string>) {
         args: args,
         usage: usage,
         group: group
-      });
+      } as FormattedDocsType);
     }
     return JSONStringify(formattedDocs);
   });
@@ -3298,7 +3392,7 @@ function printDocs(network: Object, args: Array<string>) {
 /*
  * Global set of commands
  */
-const COMMANDS = {
+const COMMANDS : Record<string, any> = {
   'authenticator': authDaemon,
   'announce': announce,
   'balance': balance,
@@ -3358,7 +3452,7 @@ export function CLIMain() {
   const argv = process.argv;
   const opts = getCLIOpts(argv);
 
-  const cmdArgs = checkArgs(opts._);
+  const cmdArgs : any = checkArgs(CLIOptAsStringArray(opts, '_') ? CLIOptAsStringArray(opts, '_') : []);
   if (!cmdArgs.success) {
     if (cmdArgs.usage) {
       if (cmdArgs.command) {
@@ -3373,34 +3467,37 @@ export function CLIMain() {
     process.exit(1);
   }
   else {
-    txOnly = opts['x'];
-    estimateOnly = opts['e'];
-    safetyChecks = !opts['U'];
-    receiveFeesPeriod = opts['N'] ? parseInt(opts['N']) : receiveFeesPeriod;
-    gracePeriod = opts['G'] ? parseInt(opts['G']) : gracePeriod;
-    maxIDSearchIndex = opts['M'] ? parseInt(opts['M']) : maxIDSearchIndex;
+    txOnly = CLIOptAsBool(opts, 'x');
+    estimateOnly = CLIOptAsBool(opts, 'e');
+    safetyChecks = !CLIOptAsBool(opts, 'U');
+    receiveFeesPeriod = opts['N'] ?
+        parseInt(CLIOptAsString(opts, 'N')) : receiveFeesPeriod;
+    gracePeriod = opts['G'] ?
+        parseInt(CLIOptAsString(opts, 'N')) : gracePeriod;
+    maxIDSearchIndex = opts['M'] ? 
+        parseInt(CLIOptAsString(opts, 'M')) : maxIDSearchIndex;
 
-    const debug = opts['d']
-    const consensusHash = opts['C'];
-    const integration_test = opts['i'];
-    const testnet = opts['t'];
-    const magicBytes = opts['m'];
-    const apiUrl = opts['H'];
-    const transactionBroadcasterUrl = opts['T'];
-    const nodeAPIUrl = opts['I'];
+    const debug = CLIOptAsBool(opts, 'd')
+    const consensusHash = CLIOptAsString(opts, 'C');
+    const integration_test = CLIOptAsBool(opts, 'i');
+    const testnet = CLIOptAsBool(opts, 't');
+    const magicBytes = CLIOptAsString(opts, 'm');
+    const apiUrl = CLIOptAsString(opts, 'H');
+    const transactionBroadcasterUrl = CLIOptAsString(opts, 'T');
+    const nodeAPIUrl = CLIOptAsString(opts, 'I');
 
     if (integration_test) {
       BLOCKSTACK_TEST = integration_test
     }
 
-    const configPath = opts['c'] ? opts['c'] : 
+    const configPath = CLIOptAsString(opts, 'c') ? CLIOptAsString(opts, 'c') : 
       (integration_test ? DEFAULT_CONFIG_REGTEST_PATH : 
       (testnet ? DEFAULT_CONFIG_TESTNET_PATH : DEFAULT_CONFIG_PATH));
 
-    const namespaceBurnAddr = opts['B'];
-    const feeRate = opts['F'];
-    const priceToPay = opts['P'];
-    const priceUnits = opts['D'];
+    const namespaceBurnAddr = CLIOptAsString(opts, 'B');
+    const feeRate = CLIOptAsString(opts, 'F') ? parseInt(CLIOptAsString(opts, 'F')) : 0;
+    const priceToPay = CLIOptAsString(opts, 'P') ? CLIOptAsString(opts, 'P') : "0";
+    const priceUnits = CLIOptAsString(opts, 'D');
 
     const networkType = testnet ? 'testnet' : (integration_test ? 'regtest' : 'mainnet');
 
@@ -3409,19 +3506,19 @@ export function CLIMain() {
       configData.logConfig.level = 'debug';
     }
     else {
-      configData.logConfig = { level: 'info' };
+      configData.logConfig.level = 'info';
     }
 
     winston.configure({ level: configData.logConfig.level, transports: [new winston.transports.Console(configData.logConfig)] })
      
-    const cliOpts = {
-      consensusHash,
-      feeRate,
-      namespaceBurnAddress: namespaceBurnAddr,
-      priceToPay,
-      priceUnits,
-      receiveFeesPeriod,
-      gracePeriod,
+    const cliOpts : CLI_NETWORK_OPTS = {
+      consensusHash: consensusHash ? consensusHash : null,
+      feeRate: feeRate ? feeRate : null,
+      namespaceBurnAddress: namespaceBurnAddr ? namespaceBurnAddr : null,
+      priceToPay: priceToPay ? priceToPay : null,
+      priceUnits: priceUnits ? priceUnits : null,
+      receiveFeesPeriod: receiveFeesPeriod ? receiveFeesPeriod : null,
+      gracePeriod: gracePeriod ? gracePeriod : null,
       altAPIUrl: (apiUrl ? apiUrl : configData.blockstackAPIUrl),
       altTransactionBroadcasterUrl: (transactionBroadcasterUrl ? 
                                      transactionBroadcasterUrl : 
@@ -3448,20 +3545,25 @@ export function CLIMain() {
     let exitcode = 0;
 
     method(blockstackNetwork, cmdArgs.args)
-    .then((result) => {
+    .then((result : string | Buffer) => {
       try {
         // if this is a JSON object with 'status', set the exit code
-        const resJson = JSON.parse(result);
-        if (resJson.hasOwnProperty('status') && !resJson.status) {
-          exitcode = 1;
+        if (result instanceof Buffer) {
+           return result;
         }
-        return result;
+        else {
+           const resJson : any = JSON.parse(result);
+           if (resJson.hasOwnProperty('status') && !resJson.status) {
+             exitcode = 1;
+           }
+           return result;
+        }
       }
       catch(e) {
         return result;
       }
     })
-    .then((result) => {
+    .then((result : string | Buffer) => {
       if (result instanceof Buffer) {
         process.stdout.write(result);
       }
@@ -3474,7 +3576,7 @@ export function CLIMain() {
         process.exit(exitcode);
       }
     })
-    .catch((e) => {
+    .catch((e : Error) => {
        console.error(e.stack);
        console.error(e.message);
        if (!noExit) {

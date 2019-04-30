@@ -1,18 +1,14 @@
-/* @flow */
-
 import logger from 'winston';
+import * as bitcoinjs from 'bitcoinjs-lib';
+import * as URL from 'url';
+import * as RIPEMD160 from 'ripemd160';
+import readline from 'readline';
+import stream from 'stream';
+import fs from 'fs';
+import blockstack from 'blockstack';
 
-const bitcoinjs = require('bitcoinjs-lib');
-const blockstack = require('blockstack');
-const URL = require('url');
-const RIPEMD160 = require('ripemd160');
-const readline = require('readline');
-const stream = require('stream');
-const fs = require('fs');
-
-import {
-  parseZoneFile
-} from 'zone-file';
+declare var ZoneFile : any;
+var ZoneFile = require('zone-file');
 
 import ecurve from 'ecurve';
 
@@ -36,22 +32,31 @@ import {
 } from './encrypt';
 
 import {
-  getOwnerKeyInfo,
-  getApplicationKeyInfo,
-  extractAppKey,
+   getOwnerKeyInfo,
+   getApplicationKeyInfo,
+   extractAppKey,
+   OwnerKeyInfoType,
+   AppKeyInfoType,
+   PaymentKeyInfoType
 } from './keys';
 
-type UTXO = { value?: number,
-              confirmations?: number,
-              tx_hash: string,
-              tx_output_n: number }
+import {
+   NameInfoType,
+   CLINetworkAdapter
+} from './network';
 
+export interface UTXO {
+   value?: number;
+   confirmations?: number;
+   tx_hash: string;
+   tx_output_n: number
+};
 
-export class NullSigner implements TransactionSigner {
+class CLITransactionSigner implements TransactionSigner {
   address: string
-  isComplete: bool
-
-  constructor(address: string) {
+  isComplete: boolean
+   
+  constructor(address: string = '') {
     this.address = address
     this.isComplete = false
   }
@@ -63,17 +68,20 @@ export class NullSigner implements TransactionSigner {
   signTransaction(txIn: bitcoinjs.TransactionBuilder, signingIndex: number) : Promise<void> {
     return Promise.resolve().then(() => {})
   }
+
+  signerVersion() : number { return 0; }
 }
 
+export class NullSigner extends CLITransactionSigner { };
 
-export class MultiSigKeySigner implements TransactionSigner {
+
+export class MultiSigKeySigner extends CLITransactionSigner {
   redeemScript: Buffer
-  privateKeys: Array<string>
-  address: string
+  privateKeys: string[]
   m: number
-  isComplete: bool
 
-  constructor(redeemScript: string, privateKeys: Array<string>) {
+  constructor(redeemScript: string, privateKeys: string[]) {
+    super();
     this.redeemScript = Buffer.from(redeemScript, 'hex')
     this.privateKeys = privateKeys
     this.isComplete = true
@@ -104,18 +112,19 @@ export class MultiSigKeySigner implements TransactionSigner {
       })
     });
   }
+   
+  signerVersion() : number { return 0; }
 }
 
 
-export class SegwitP2SHKeySigner implements TransactionSigner {
+export class SegwitP2SHKeySigner extends CLITransactionSigner {
   redeemScript: Buffer
   witnessScript: Buffer
-  privateKeys: Array<string>
-  address: string
+  privateKeys: string[]
   m: number
-  isComplete: bool
 
-  constructor(redeemScript: string, witnessScript: string, m: number, privateKeys: Array<string>) {
+  constructor(redeemScript: string, witnessScript: string, m: number, privateKeys: string[]) {
+    super();
     this.redeemScript = Buffer.from(redeemScript, 'hex');
     this.witnessScript = Buffer.from(witnessScript, 'hex');
     this.address = bitcoinjs.address.toBase58Check(
@@ -131,11 +140,12 @@ export class SegwitP2SHKeySigner implements TransactionSigner {
     return Promise.resolve().then(() => this.address);
   }
 
-  findUTXO(txIn: bitcoinjs.TransactionBuilder, signingIndex: number, utxos: Array<UTXO>) : UTXO {
+  findUTXO(txIn: bitcoinjs.TransactionBuilder, signingIndex: number, utxos: UTXO[]) : UTXO {
     // NOTE: this is O(n*2) complexity for n UTXOs when signing an n-input transaction
     // NOTE: as of bitcoinjs-lib 4.x, the "tx" field is private
-    const txidBuf = new Buffer(txIn.__tx.ins[signingIndex].hash.slice());
-    const outpoint = txIn.__tx.ins[signingIndex].index;
+    const private_tx = (txIn as any).__tx;
+    const txidBuf = new Buffer(private_tx.ins[signingIndex].hash.slice());
+    const outpoint = private_tx.ins[signingIndex].index;
     
     txidBuf.reverse(); // NOTE: bitcoinjs encodes txid as big-endian
     const txid = txidBuf.toString('hex')
@@ -180,6 +190,8 @@ export class SegwitP2SHKeySigner implements TransactionSigner {
         }
       });
   }
+
+  signerVersion() : number { return 0; }
 }
 
 export class SafetyError extends Error {
@@ -190,12 +202,17 @@ export class SafetyError extends Error {
   }
 }
 
-export function hasKeys(signer: String | TransactionSigner) : bool {
-  if (typeof signer === 'string') {
-    return true;
+function isCLITransactionSigner(signer: string | CLITransactionSigner) : signer is CLITransactionSigner {
+   return (<CLITransactionSigner>signer).signerVersion !== undefined;
+}
+
+export function hasKeys(signer: string | CLITransactionSigner) : boolean {
+  if (isCLITransactionSigner(signer)) {
+     let s = signer as CLITransactionSigner;
+     return s.isComplete;
   }
   else {
-    return (signer.isComplete ? true : false);
+     return true;
   }
 }
 
@@ -249,7 +266,7 @@ export function parseMultiSigKeys(serializedPrivateKeys: string) : MultiSigKeySi
 
   // generate redeem script
   const multisigInfo = bitcoinjs.payments.p2ms({ m, pubkeys });
-  return new MultiSigKeySigner(multisigInfo.output, privkeys);
+  return new MultiSigKeySigner(multisigInfo.output.toString('hex'), privkeys);
 }
 
 
@@ -287,14 +304,14 @@ export function parseSegwitP2SHKeys(serializedPrivateKeys: string) : SegwitP2SHK
   });
 
   // generate redeem script for p2wpkh or p2sh, depending on how many keys 
-  let redeemScript;
-  let witnessScript = '';
+  let redeemScript : string;
+  let witnessScript : string = '';
   if (m === 1) {
     // p2wpkh 
     const p2wpkh = bitcoinjs.payments.p2wpkh({ pubkey: pubkeys[0] });
     const p2sh = bitcoinjs.payments.p2sh({ redeem: p2wpkh });
 
-    redeemScript = p2sh.redeem.output;
+    redeemScript = p2sh.redeem.output.toString('hex');
   }
   else {
     // p2wsh
@@ -302,8 +319,8 @@ export function parseSegwitP2SHKeys(serializedPrivateKeys: string) : SegwitP2SHK
     const p2wsh = bitcoinjs.payments.p2wsh({ redeem: p2ms });
     const p2sh = bitcoinjs.payments.p2sh({ redeem: p2wsh });
 
-    redeemScript = p2sh.redeem.output;
-    witnessScript = p2wsh.redeem.output;
+    redeemScript = p2sh.redeem.output.toString('hex');
+    witnessScript = p2wsh.redeem.output.toString('hex');
   }
 
   return new SegwitP2SHKeySigner(redeemScript, witnessScript, m, privkeys);
@@ -312,11 +329,11 @@ export function parseSegwitP2SHKeys(serializedPrivateKeys: string) : SegwitP2SHK
 /*
  * Decode one or more private keys from a string.
  * Can be used to parse single private keys (as strings),
- * or multisig bundles (as TransactionSigners)
+ * or multisig bundles (as CLITransactionSigners)
  * @serializedPrivateKey (string) the private key, encoded
- * @return a TransactionSigner or a String
+ * @return a CLITransactionSigner or a String
  */
-export function decodePrivateKey(serializedPrivateKey: string) : string | TransactionSigner {
+export function decodePrivateKey(serializedPrivateKey: string) : string | CLITransactionSigner {
   const nosignMatches = serializedPrivateKey.match(PRIVATE_KEY_NOSIGN_PATTERN);
   if (!!nosignMatches) {
     // no private key 
@@ -371,14 +388,15 @@ export function getPublicKeyFromPrivateKey(privateKey: string) : string {
  * Get a private key's address.  Honor the 01 to compress the public key
  * @privateKey (string) the hex-encoded private key
  */
-export function getPrivateKeyAddress(network: Object, privateKey: string | TransactionSigner) 
-  : string {
-  if (typeof privateKey === 'string') {
-    const ecKeyPair = blockstack.hexStringToECPair(privateKey);
-    return network.coerceAddress(blockstack.ecPairToAddress(ecKeyPair));
+export function getPrivateKeyAddress(network: CLINetworkAdapter, privateKey: string | CLITransactionSigner) : string {
+   if (isCLITransactionSigner(privateKey)) {
+     const pkts = privateKey as CLITransactionSigner;
+     return pkts.address;
   }
   else {
-    return privateKey.address;
+    const pk = privateKey as string;
+    const ecKeyPair = blockstack.hexStringToECPair(pk);
+    return network.coerceAddress(blockstack.ecPairToAddress(ecKeyPair));
   }
 }
 
@@ -404,14 +422,14 @@ export function canonicalPrivateKey(privkey: string) : string {
  * Get the sum of a set of UTXOs' values
  * @txIn (object) the transaction
  */
-export function sumUTXOs(utxos: Array<UTXO>) {
+export function sumUTXOs(utxos: UTXO[]) : number {
   return utxos.reduce((agg, x) => agg + x.value, 0);
 }
 
 /*
  * Hash160 function for zone files
  */
-export function hash160(buff: Buffer) {
+export function hash160(buff: Buffer) : Buffer {
   return bitcoinjs.crypto.hash160(buff);
 }
 
@@ -447,14 +465,14 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
  * Returns an object that encodes the success/failure of doing so.
  * If zonefile is None, then only the transaction will be sent.
  */
-export function broadcastTransactionAndZoneFile(network: Object,
+export function broadcastTransactionAndZoneFile(network: CLINetworkAdapter,
                                                 tx: string,
-                                                zonefile: ?string = null) {
-  let txid;
+                                                zonefile?: string) {
+  let txid : string;
   return Promise.resolve().then(() => {
     return network.broadcastTransaction(tx);
   })
-  .then((_txid) => {
+  .then((_txid : string) => {
     txid = _txid;
     if (zonefile) {
       return network.broadcastZoneFile(zonefile, txid);
@@ -492,10 +510,10 @@ export function broadcastTransactionAndZoneFile(network: Object,
 /*
  * Easier-to-use getNameInfo.  Returns null if the name does not exist.
  */
-export function getNameInfoEasy(network: Object, name: string) : Promise<*> {
+export function getNameInfoEasy(network: CLINetworkAdapter, name: string) : Promise<NameInfoType | null> {
   const nameInfoPromise = network.getNameInfo(name)
-    .then((nameInfo) => nameInfo)
-    .catch((error) => {
+    .then((nameInfo : NameInfoType) => nameInfo)
+    .catch((error : Error) : null => {
       if (error.message === 'Name not found') {
         return null;
       } else {
@@ -510,15 +528,15 @@ export function getNameInfoEasy(network: Object, name: string) : Promise<*> {
  * Look up a name's zone file, profile URL, and profile
  * Returns a Promise to the above, or throws an error.
  */
-export function nameLookup(network: Object, name: string, includeProfile?: boolean = true) 
-  : Promise<{ profile: Object | null, profileUrl: ?string, zonefile: ?string }> {
+export function nameLookup(network: CLINetworkAdapter, name: string, includeProfile: boolean = true) 
+  : Promise<{ profile: any, profileUrl?: string, zonefile?: string }> {
 
   const nameInfoPromise = getNameInfoEasy(network, name);
   const profilePromise = includeProfile ?
     blockstack.lookupProfile(name).catch(() => null) :
     Promise.resolve().then(() => null);
 
-  const zonefilePromise = nameInfoPromise.then((nameInfo) => nameInfo ? nameInfo.zonefile : null);
+  const zonefilePromise = nameInfoPromise.then((nameInfo : NameInfoType) => nameInfo ? nameInfo.zonefile : null);
 
   return Promise.resolve().then(() => {
     return Promise.all([profilePromise, zonefilePromise, nameInfoPromise])
@@ -534,7 +552,7 @@ export function nameLookup(network: Object, name: string, includeProfile?: boole
 
     let profileUrl = null;
     try {
-      const zonefileJSON = parseZoneFile(zonefile);
+      const zonefileJSON = ZoneFile.parseZoneFile(zonefile);
       if (zonefileJSON.uri && zonefileJSON.hasOwnProperty('$origin')) {
         profileUrl = blockstack.getTokenFileUrl(zonefileJSON);
       }
@@ -584,7 +602,7 @@ export function getpass(promptStr: string, cb: (passwd: string) => void) {
  * be returned.  If the ciphertext is given, the user will be prompted for a password
  * (if a password is not given as an argument).
  */
-export function getBackupPhrase(backupPhraseOrCiphertext: string, password: ?string) : Promise<string> {
+export function getBackupPhrase(backupPhraseOrCiphertext: string, password?: string) : Promise<string> {
   if (backupPhraseOrCiphertext.split(/ +/g).length > 1) {
     // raw backup phrase 
     return Promise.resolve().then(() => backupPhraseOrCiphertext);
@@ -603,7 +621,7 @@ export function getBackupPhrase(backupPhraseOrCiphertext: string, password: ?str
         });
       }
     })
-    .then((pass) => decryptBackupPhrase(Buffer.from(backupPhraseOrCiphertext, 'base64'), pass));
+    .then((pass : string) => decryptBackupPhrase(Buffer.from(backupPhraseOrCiphertext, 'base64'), pass));
   }
 }
 
@@ -644,7 +662,7 @@ export function mkdirs(path: string) : void {
 /*
  * Given a name or ID address, return a promise to the ID Address
  */
-export function getIDAddress(network: Object, nameOrIDAddress: string) : Promise<*> {
+export function getIDAddress(network: CLINetworkAdapter, nameOrIDAddress: string) : Promise<string> {
   let idAddressPromise;
   if (nameOrIDAddress.match(ID_ADDRESS_PATTERN)) {
     idAddressPromise = Promise.resolve().then(() => nameOrIDAddress);
@@ -652,7 +670,7 @@ export function getIDAddress(network: Object, nameOrIDAddress: string) : Promise
   else {
     // need to look it up 
     idAddressPromise = network.getNameInfo(nameOrIDAddress)
-      .then((nameInfo) => `ID-${nameInfo.address}`);
+      .then((nameInfo : NameInfoType) => `ID-${nameInfo.address}`);
   }
   return idAddressPromise;
 }
@@ -661,7 +679,7 @@ export function getIDAddress(network: Object, nameOrIDAddress: string) : Promise
  * Find all identity addresses until we have one that matches the given one.
  * Loops forever if not found
  */
-export function getOwnerKeyFromIDAddress(network: Object, 
+export function getOwnerKeyFromIDAddress(network: CLINetworkAdapter, 
                                          mnemonic: string, 
                                          idAddress: string
 ) : string {
@@ -681,22 +699,28 @@ export function getOwnerKeyFromIDAddress(network: Object,
  * private keys.
  * May prompt for a password if mnemonic is encrypted.
  */
-export function getIDAppKeys(network: Object, 
+export interface IDAppKeys {
+   ownerPrivateKey: string;
+   appPrivateKey: string;
+   mnemonic: string
+};
+      
+export function getIDAppKeys(network: CLINetworkAdapter,
                              nameOrIDAddress: string,
                              appOrigin: string,
                              mnemonicOrCiphertext: string,
-) : Promise<{ ownerPrivateKey: string, appPrivateKey: string, mnemonic: string }> {
+) : Promise<IDAppKeys> {
 
-  let mnemonic;
-  let ownerPrivateKey;
-  let appPrivateKey;
+  let mnemonic : string;
+  let ownerPrivateKey : string;
+  let appPrivateKey : string;
 
   return getBackupPhrase(mnemonicOrCiphertext)
-    .then((mn) => {
+    .then((mn : string) => {
       mnemonic = mn;
       return getIDAddress(network, nameOrIDAddress)
     })
-    .then((idAddress) => {
+    .then((idAddress : string) => {
       const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
       appPrivateKey = extractAppKey(network, appKeyInfo);
       ownerPrivateKey = getOwnerKeyFromIDAddress(network, mnemonic, idAddress);

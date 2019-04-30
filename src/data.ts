@@ -1,10 +1,13 @@
-/* @flow */
+import blockstack from 'blockstack';
+import * as bitcoin from 'bitcoinjs-lib';
+import * as URL from 'url';
+import crypto from 'crypto';
 
-const blockstack = require('blockstack');
-const jsontokens = require('jsontokens');
-const bitcoin = require('bitcoinjs-lib');
-const URL = require('url');
-const crypto = require('crypto');
+declare var jsontokens : any;
+var jsontokens = require('jsontokens');
+
+declare var ZoneFile : any;
+var ZoneFile = require('zone-file');
 
 import {
   canonicalPrivateKey,
@@ -15,17 +18,27 @@ import {
 } from './utils';
 
 import {
-  parseZoneFile
-} from 'zone-file';
+   CLINetworkAdapter,
+   NameInfoType
+} from './network';
+
+import {
+   UserData
+} from 'blockstack/lib/auth/authApp';
+
+import {
+   GaiaHubConfig
+} from 'blockstack/lib/storage/hub';
+
 
 /*
  * Set up a session for Gaia.
  * Generate an authentication response like what the browser would do,
  * and store the relevant data to our emulated localStorage.
  */
-function makeFakeGaiaSessionToken(appPrivateKey: string | null,
-                                  hubURL: string | null,
-                                  associationToken?: string) {  
+function makeFakeAuthResponseToken(appPrivateKey: string | null,
+                                   hubURL: string | null,
+                                   associationToken?: string) {  
   const ownerPrivateKey = '24004db06ef6d26cdd2b0fa30b332a1b10fa0ba2b07e63505ffc2a9ed7df22b4';
   const transitPrivateKey = 'f33fb466154023aba2003c17158985aa6603db68db0f1afc0fcf1d641ea6c2cb';
   const transitPublicKey = '0496345da77fb5e06757b9c4fd656bf830a3b293f245a6cc2f11f8334ebb690f1' + 
@@ -62,7 +75,7 @@ export function makeAssociationToken(appPrivateKey: string, identityKey: string)
   const associationTokenClaim = {
     childToAssociate: appPublicKey,
     iss: identityPublicKey,
-    exp: FOUR_MONTH_SECONDS + (new Date()/1000),
+    exp: FOUR_MONTH_SECONDS + ((new Date().getTime())/1000),
     salt 
   }
   const associationToken = new jsontokens.TokenSigner('ES256K', identityKey)
@@ -75,11 +88,12 @@ export function makeAssociationToken(appPrivateKey: string, identityKey: string)
  * Process a (fake) session token and set up a Gaia hub connection.
  * Returns a Promise that resolves to the (fake) userData
  */
-export function gaiaAuth(appPrivateKey: string | null,
+export function gaiaAuth(network: CLINetworkAdapter,
+                         appPrivateKey: string | null,
                          hubUrl: string | null,
-                         ownerPrivateKey?: string) {
+                         ownerPrivateKey?: string) : Promise<UserData> {
   // Gaia speaks mainnet only!
-  if (!blockstack.config.network.isMainnet()) {
+  if (!network.isMainnet()) {
     throw new Error('Gaia only works with mainnet networks.');
   }
 
@@ -88,9 +102,10 @@ export function gaiaAuth(appPrivateKey: string | null,
     associationToken = makeAssociationToken(appPrivateKey, ownerPrivateKey);
   }
 
-  const gaiaSessionToken = makeFakeGaiaSessionToken(appPrivateKey, hubUrl, associationToken);
-  const nameLookupUrl = `${blockstack.config.network.blockstackAPIUrl}/v1/names/`;
-  return blockstack.handlePendingSignIn(nameLookupUrl, gaiaSessionToken);
+  const authSessionToken = makeFakeAuthResponseToken(appPrivateKey, hubUrl, associationToken);
+  const nameLookupUrl = `${network.blockstackAPIUrl}/v1/names/`;
+  const transitPrivateKey = 'f33fb466154023aba2003c17158985aa6603db68db0f1afc0fcf1d641ea6c2cb';     // same as above
+  return blockstack.handlePendingSignIn(nameLookupUrl, authSessionToken, transitPrivateKey);
 }
 
 
@@ -100,7 +115,7 @@ export function gaiaAuth(appPrivateKey: string | null,
  * Make sure we use a mainnet address always, even in test mode.
  * Returns a Promise that resolves to a GaiaHubConfig
  */
-export function gaiaConnect(network: Object,
+export function gaiaConnect(network: CLINetworkAdapter,
                             gaiaHubUrl: string, 
                             privateKey: string,
                             ownerPrivateKey?: string
@@ -141,8 +156,8 @@ export function gaiaConnect(network: Object,
  * Returns a Promise that resolves to the filename to use for the profile
  * Throws an exception if the profile URL could not be determined
  */
-function gaiaFindProfileName(network: Object,
-                             hubConfig: Object,
+function gaiaFindProfileName(network: CLINetworkAdapter,
+                             hubConfig: GaiaHubConfig,
                              blockstackID?: string
 ): Promise<string> {
   if (blockstackID === null || blockstackID === undefined) {
@@ -150,10 +165,10 @@ function gaiaFindProfileName(network: Object,
   }
   else {
     return network.getNameInfo(blockstackID)
-      .then((nameInfo) =>  {
+      .then((nameInfo : NameInfoType) =>  {
         let profileUrl;
         try {
-          const zonefileJSON = parseZoneFile(nameInfo.zonefile);
+          const zonefileJSON = ZoneFile.parseZoneFile(nameInfo.zonefile);
           if (zonefileJSON.uri && zonefileJSON.hasOwnProperty('$origin')) {
             profileUrl = blockstack.getTokenFileUrl(zonefileJSON);
           }
@@ -200,15 +215,15 @@ function gaiaFindProfileName(network: Object,
  * @privateKey (string) the private key to use to sign the challenge
  * @blockstackID (string) optional; the blockstack ID for which this profile will be stored.
  */
-export function gaiaUploadProfile(network: Object,
+export function gaiaUploadProfile(network: CLINetworkAdapter,
                                   gaiaHubURL: string, 
                                   gaiaData: string,
                                   privateKey: string,
                                   blockstackID?: string
 ) {
-  let hubConfig;
+  let hubConfig : GaiaHubConfig;
   return gaiaConnect(network, gaiaHubURL, privateKey)
-    .then((hubconf) => {
+    .then((hubconf : GaiaHubConfig) => {
       // make sure we use the *right* gaia path.
       // if the blockstackID is given, then we should inspect the zone file to
       // determine if the Gaia profile URL contains an index.  If it does, then 
@@ -216,7 +231,7 @@ export function gaiaUploadProfile(network: Object,
       hubConfig = hubconf;
       return gaiaFindProfileName(network, hubConfig, blockstackID);
     })
-    .then((profilePath) => {
+    .then((profilePath : string) => {
       return blockstack.uploadToGaiaHub(profilePath, gaiaData, hubConfig);
     });
 }
@@ -229,12 +244,12 @@ export function gaiaUploadProfile(network: Object,
  * @privateKey (string) the hex-encoded private key
  * @return a promise with {'dataUrls': [urls to the data]}, or {'error': ...}
  */
-export function gaiaUploadProfileAll(network: Object,
-                                     gaiaUrls: Array<string>,
+export function gaiaUploadProfileAll(network: CLINetworkAdapter,
+                                     gaiaUrls: string[],
                                      gaiaData: string,
                                      privateKey: string,
                                      blockstackID?: string
-) : Promise<*> {
+) : Promise<{dataUrls?: string[], error?: string}> {
   const sanitizedGaiaUrls = gaiaUrls.map((gaiaUrl) => {
     const urlInfo = URL.parse(gaiaUrl);
     if (!urlInfo.protocol) {
@@ -271,7 +286,7 @@ export function gaiaUploadProfileAll(network: Object,
  *
  * Returns a promise that resolves to the zone file with the profile URL
  */
-export function makeZoneFileFromGaiaUrl(network: Object, name: string, 
+export function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string, 
   gaiaHubUrl: string, ownerKey: string) {
 
   const address = getPrivateKeyAddress(network, ownerKey);
@@ -318,7 +333,7 @@ export function getGaiaAddressFromURL(appUrl: string): string {
  * Returns the address on success
  * Throws on error or not found
  */
-export function getGaiaAddressFromProfile(network: Object, profile: Object, appOrigin: string): string {
+export function getGaiaAddressFromProfile(network: CLINetworkAdapter, profile: any, appOrigin: string): string {
   if (!profile) {
     throw new Error('No profile');
   }

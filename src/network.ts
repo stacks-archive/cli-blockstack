@@ -1,33 +1,76 @@
-/* @flow */
+import blockstack from 'blockstack';
+import * as bitcoin from 'bitcoinjs-lib';
+import BN from 'bn.js';
 
-const blockstack = require('blockstack');
-const Promise = require('bluebird');
-const bigi = require('bigi');
-const bitcoin = require('bitcoinjs-lib');
+import {
+   CLI_CONFIG_TYPE
+} from './argparse';
 
-Promise.onPossiblyUnhandledRejection(function(error){
+import {
+   BlockstackNetwork
+} from 'blockstack/lib/network';
+
+/*
+import * as Promise from 'bluebird';
+Promise.onPossiblyUnhandledRejection(function(error : Error) {
     throw error;
 });
+ */
 
 const SATOSHIS_PER_BTC = 1e8
+
+export interface CLI_NETWORK_OPTS {
+   consensusHash: string | null;
+   feeRate: number | null;
+   namespaceBurnAddress: string | null;
+   priceToPay: string | null;
+   priceUnits: string | null;
+   receiveFeesPeriod: number | null;
+   gracePeriod: number | null;
+   altAPIUrl: string | null;
+   altTransactionBroadcasterUrl: string | null;
+   nodeAPIUrl: string | null;
+};
+
+export interface PriceType {
+   units: "BTC" | "STACKS";
+   amount: BN
+};
+
+export interface NameInfoType {
+   address: string;
+   blockchain: string;
+   did: string;
+   expire_block: number;
+   grace_period: number;
+   last_txid: string;
+   renewal_deadline: number;
+   resolver: string | null;
+   status: string;
+   zonefile: string | null;
+   zonefile_hash: string | null;
+}
 
 /*
  * Adapter class that allows us to use data obtained
  * from the CLI.
  */
-export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
+export class CLINetworkAdapter extends BlockstackNetwork {
   consensusHash: string | null
   feeRate: number | null
   namespaceBurnAddress: string | null
-  priceToPay: number | null
+  priceToPay: string | null
   priceUnits: string | null
   gracePeriod: number | null
+  receiveFeesPeriod: number | null
+  nodeAPIUrl: string
+  optAlwaysCoerceAddress : boolean
 
-  constructor(network: blockstack.network.BlockstackNetwork, opts: Object) {
-    const optsDefault = {
+  constructor(network: BlockstackNetwork, opts: CLI_NETWORK_OPTS) {
+    const optsDefault : CLI_NETWORK_OPTS = {
       consensusHash: null,
       feeRate: null,
-      namesspaceBurnAddress: null,
+      namespaceBurnAddress: null,
       priceToPay: null,
       priceUnits: null,
       receiveFeesPeriod: null,
@@ -91,74 +134,74 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
     return super.getFeeRate()
   }
 
-  getConsensusHash() {
+  getConsensusHash() : Promise<string> {
     // override with CLI option
     if (this.consensusHash) {
-      return new Promise((resolve) => resolve(this.consensusHash))
+      return new Promise((resolve: any) => resolve(this.consensusHash))
     }
-    return super.getConsensusHash()
+    return super.getConsensusHash().then((c: string) => c)
   }
 
-  getGracePeriod() {
+  getGracePeriod() : Promise<number> {
     if (this.gracePeriod) {
-      return this.gracePeriod
+       return new Promise((resolve: any) => resolve(this.gracePeriod))
     }
-    return super.getGracePeriod()
+    return super.getGracePeriod().then((g: number) => g)
   }
 
-  getNamePrice(name: string) {
+  getNamePrice(name: string) : Promise<PriceType> {
     // override with CLI option 
     if (this.priceUnits && this.priceToPay) {
-      return new Promise((resolve) => resolve({
+      return new Promise((resolve: any) => resolve({
         units: String(this.priceUnits),
-        amount: bigi.fromByteArrayUnsigned(String(this.priceToPay))
-      }))
+        amount: new BN(this.priceToPay)
+      } as PriceType))
     }
     return super.getNamePrice(name)
-      .then((priceInfo) => {
+      .then((priceInfo : PriceType) => {
         // use v2 scheme
         if (!priceInfo.units) {
           priceInfo = {
             units: 'BTC',
-            amount: bigi.fromByteArrayUnsigned(String(priceInfo))
+            amount: new BN(String(priceInfo))
           }
         }
         return priceInfo;
       })
   }
 
-  getNamespacePrice(namespaceID: string) {
+  getNamespacePrice(namespaceID: string) : Promise<PriceType> {
     // override with CLI option 
     if (this.priceUnits && this.priceToPay) {
-      return new Promise((resolve) => resolve({
+      return new Promise((resolve: any) => resolve({
         units: String(this.priceUnits),
-        amount: bigi.fromByteArrayUnsigned(String(this.priceToPay))
-      }))
+        amount: new BN(String(this.priceToPay)),
+      } as PriceType))
     }
     return super.getNamespacePrice(namespaceID)
-      .then((priceInfo) => {
+      .then((priceInfo : PriceType) => {
         // use v2 scheme
         if (!priceInfo.units) {
           priceInfo = {
             units: 'BTC',
-            amount: bigi.fromByteArrayUnsigned(String(priceInfo))
-          }
+            amount: new BN(String(priceInfo)),
+          } as PriceType;
         }
         return priceInfo;
       })
   }
 
-  getNamespaceBurnAddress(namespace: string, useCLI: ?boolean = true) {
+  getNamespaceBurnAddress(namespace: string, useCLI: boolean = true, receiveFeesPeriod : number = -1) : Promise<string> {
     // override with CLI option
     if (this.namespaceBurnAddress && useCLI) {
-      return new Promise((resolve) => resolve(this.namespaceBurnAddress))
+      return new Promise((resolve: any) => resolve(this.namespaceBurnAddress))
     }
 
     return Promise.all([
       fetch(`${this.blockstackAPIUrl}/v1/namespaces/${namespace}`),
       this.getBlockHeight()
     ])
-    .then(([resp, blockHeight]) => {
+    .then(([resp, blockHeight] : [any, number]) => {
       if (resp.status === 404) {
         throw new Error(`No such namespace '${namespace}'`)
       } else if (resp.status !== 200) {
@@ -167,35 +210,45 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
         return Promise.all([resp.json(), blockHeight])
       }
     })
-    .then(([namespaceInfo, blockHeight]) => {
+    .then(([namespaceInfo, blockHeight] : [any, number]) => {
       let address = '1111111111111111111114oLvT2' // default burn address
       if (namespaceInfo.version === 2) {
         // pay-to-namespace-creator if this namespace is less than $receiveFeesPeriod blocks old
-        if (namespaceInfo.reveal_block + this.receiveFeesPeriod > blockHeight) {
+        if (receiveFeesPeriod < 0) {
+           receiveFeesPeriod = this.receiveFeesPeriod
+        }
+
+        if (namespaceInfo.reveal_block + receiveFeesPeriod > blockHeight) {
           address = namespaceInfo.address
         }
       }
       return address
     })
-    .then(address => this.coerceAddress(address))
+    .then((address : string) => this.coerceAddress(address))
   }
 
-  getNameInfo(name: string) {
+  getNameInfo(name: string) : Promise<NameInfoType> {
     // optionally coerce addresses
     return super.getNameInfo(name)
-      .then((nameInfo) => {
-        if (this.optAlwaysCoerceAddress) {
-          nameInfo = Object.assign(nameInfo, {
-            'address': this.coerceMainnetAddress(nameInfo.address)
-          })
-        }
-
-        return nameInfo
+     .then((ni : any) => {
+        let nameInfo : NameInfoType = {
+           address: this.optAlwaysCoerceAddress ? this.coerceMainnetAddress(ni.address) : ni.address,
+           blockchain: ni.blockchain,
+           did: ni.did,
+           expire_block: ni.expire_block,
+           grace_period: ni.grace_period,
+           last_txid: ni.last_txid,
+           renewal_deadline: ni.renewal_deadline,
+           resolver: ni.resolver,
+           status: ni.status,
+           zonefile: ni.zonefile,
+           zonefile_hash: ni.zonefile_hash
+        };
+        return nameInfo;
       })
   }
 
-
-  getBlockchainNameRecord(name: string) : Promise<*> {
+  getBlockchainNameRecord(name: string) : Promise<any> {
     // TODO: send to blockstack.js
     const url = `${this.blockstackAPIUrl}/v1/blockchains/bitcoin/names/${name}`
     return fetch(url)
@@ -209,7 +262,7 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
       })
       .then((nameInfo) => {
         // coerce all addresses
-        let fixedAddresses = {}
+        let fixedAddresses : Record<string, any> = {}
         for (let addrAttr of ['address', 'importer_address', 'recipient_address']) {
           if (nameInfo.hasOwnProperty(addrAttr) && nameInfo[addrAttr]) {
             fixedAddresses[addrAttr] = this.coerceAddress(nameInfo[addrAttr])
@@ -219,7 +272,7 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
     })
   }
 
-  getNameHistory(name: string, page: number) : Promise<*> { 
+  getNameHistory(name: string, page: number) : Promise<Record<string, any[]>> { 
     // TODO: send to blockstack.js 
     const url = `${this.blockstackAPIUrl}/v1/names/${name}/history?page=${page}`
     return fetch(url)
@@ -231,12 +284,12 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
       })
       .then((historyInfo) => {
         // coerce all addresses 
-        let fixedHistory = {}
+        let fixedHistory : Record<string, any[]>= {}
         for (let historyBlock of Object.keys(historyInfo)) {
-          let fixedHistoryList = []
+          let fixedHistoryList : any[] = []
           for (let historyEntry of historyInfo[historyBlock]) {
-            let fixedAddresses = {}
-            let fixedHistoryEntry = null 
+            let fixedAddresses : Record<string, string> = {}
+            let fixedHistoryEntry : any = {}
             for (let addrAttr of ['address', 'importer_address', 'recipient_address']) {
               if (historyEntry.hasOwnProperty(addrAttr) && historyEntry[addrAttr]) {
                 fixedAddresses[addrAttr] = this.coerceAddress(historyEntry[addrAttr])
@@ -255,8 +308,7 @@ export class CLINetworkAdapter extends blockstack.network.BlockstackNetwork {
 /*
  * Instantiate a network using settings from the config file.
  */
-export function getNetwork(configData: Object, regTest: boolean) 
-  : blockstack.network.BlockstackNetwork {
+export function getNetwork(configData: CLI_CONFIG_TYPE, regTest: boolean) : BlockstackNetwork {
   if (regTest) {
     const network = new blockstack.network.LocalRegtest(
       configData.blockstackAPIUrl, configData.broadcastServiceUrl, 
@@ -265,7 +317,7 @@ export function getNetwork(configData: Object, regTest: boolean)
 
     return network
   } else {
-    const network = new blockstack.network.BlockstackNetwork(
+    const network = new BlockstackNetwork(
       configData.blockstackAPIUrl, configData.broadcastServiceUrl,
       new blockstack.network.BlockchainInfoApi(configData.utxoServiceUrl))
 
