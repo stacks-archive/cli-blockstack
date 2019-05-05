@@ -2411,8 +2411,9 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   return Promise.resolve().then(() => {
     return network.getAccountTokens(address);
   })
-  .then((tokenList : { tokens: string[] }) => {
-    let tokenAndBTC = tokenList.tokens;
+   // .then((tokenList : { tokens: string[] }) => { // waiting on upstream fix
+  .then((tokenList : any) => {
+    let tokenAndBTC = tokenList.tokens as string[];
     if (!tokenAndBTC) {
       tokenAndBTC = [];
     }
