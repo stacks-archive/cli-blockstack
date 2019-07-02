@@ -987,6 +987,7 @@ function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   let zonefilePath : string = '';
   let zonefileHash : string = '';
   let zonefile : string = '';
+  let blankZonefileHash : boolean = true;
 
   if (args.length >= 4 && !!args[3]) {
     // ID-address
@@ -997,10 +998,12 @@ function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   }
 
   if (args.length >= 5 && !!args[4]) {
+    blankZonefileHash = false;
     zonefilePath = args[4];
   }
 
   if (args.length >= 6 && !!args[5]) {
+    blankZonefileHash = false;
     zonefileHash = args[5];
     zonefilePath = null;
     logger.debug(`Using zone file hash ${zonefileHash} instead of zone file`);
@@ -1030,7 +1033,7 @@ function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
       const sha256 = bitcoin.crypto.sha256(new Buffer(zonefile))
       const h = (new RIPEMD160()).update(sha256).digest('hex')
       resolve(h);
-    } else if (!!zonefileHash) {
+    } else if (!!zonefileHash || blankZonefileHash) {
       // already have the hash 
       resolve(zonefileHash);
     } else {

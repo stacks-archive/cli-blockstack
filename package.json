@@ -2,7 +2,7 @@
   "name": "blockstack-cli",
   "version": "0.0.1",
   "description": "Node.js Blockstack CLI",
-  "main": "lib/index",
+  "main": "./lib/index.js",
   "engines": {
     "node": ">=6",
     "npm": ">=5"
@@ -10,10 +10,9 @@
   "scripts": {
     "compile": "rm -rf lib; babel src -d lib",
     "compile-tests": "rm -rf tests/unitTests/lib; babel tests/unitTests/src -d tests/unitTests/lib;",
-    "build": "tsc && chmod +x lib/index.js",
+    "build": "tsc",
     "lint": "eslint src && eslint tests",
-    "test": "nyc --reporter=text npm run unit-test",
-    "force-executable": "test -f ./lib/index.js && chmod +x ./lib/index.js"
+    "test": "nyc --reporter=text npm run unit-test"
   },
   "repository": {
     "type": "git",
