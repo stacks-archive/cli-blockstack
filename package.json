@@ -11,7 +11,7 @@
     "compile": "rm -rf lib; babel src -d lib",
     "compile-tests": "rm -rf tests/unitTests/lib; babel tests/unitTests/src -d tests/unitTests/lib;",
     "build": "tsc",
-    "lint": "eslint src && eslint tests",
+    "lint": "eslint src && eslint tests"
   },
   "repository": {
     "type": "git",
