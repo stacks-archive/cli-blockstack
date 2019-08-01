@@ -160,7 +160,7 @@ function gaiaFindProfileName(network: CLINetworkAdapter,
                              hubConfig: GaiaHubConfig,
                              blockstackID?: string
 ): Promise<string> {
-  if (blockstackID === null || blockstackID === undefined) {
+  if (!blockstackID || blockstackID === null || blockstackID === undefined) {
     return Promise.resolve().then(() => 'profile.json')
   }
   else {
