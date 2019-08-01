@@ -1,10 +1,5 @@
 import Ajv from 'ajv';
 import process from 'process';
-
-declare var c32check : any;
-var c32check = require('c32check');
-
-import os from 'os';
 import fs from 'fs';
 
 export const NAME_PATTERN = 

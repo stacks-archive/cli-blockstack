@@ -4,24 +4,16 @@ import process from 'process';
 import fs from 'fs';
 import winston from 'winston'
 import logger from 'winston'
-import expressWinston from 'express-winston'
 import cors from 'cors'
 import RIPEMD160 from 'ripemd160'
 import BN from 'bn.js'
-import URL from 'url'
 import crypto from 'crypto'
 import bip39 from 'bip39'
 import express from 'express'
-import * as pathTools from 'path'
-
-declare var jsontokens : any;
-var jsontokens = require('jsontokens');
+import path from 'path'
 
 declare var c32check : any;
 var c32check = require('c32check');
-
-declare var ZoneFile : any;
-var ZoneFile = require('zone-file')
 
 import {
    UserData
@@ -2414,9 +2406,8 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   return Promise.resolve().then(() => {
     return network.getAccountTokens(address);
   })
-   // .then((tokenList : { tokens: string[] }) => { // waiting on upstream fix
-  .then((tokenList : any) => {
-    let tokenAndBTC = tokenList.tokens as string[];
+  .then((tokenList) => {
+    let tokenAndBTC = tokenList.tokens;
     if (!tokenAndBTC) {
       tokenAndBTC = [];
     }
@@ -2793,7 +2784,7 @@ function gaiaPutFile(network: CLINetworkAdapter, args: string[]) : Promise<strin
   const hubUrl = args[0];
   const appPrivateKey = args[1];
   const dataPath = args[2];
-  const gaiaPath = pathTools.normalize(args[3].replace(/^\/+/, ''));
+  const gaiaPath = path.normalize(args[3].replace(/^\/+/, ''));
 
   let encrypt = false;
   let sign = false;
@@ -2888,7 +2879,7 @@ function gaiaDumpBucket(network: CLINetworkAdapter, args: string[]) : Promise<st
   if (dumpDir[0] !== '/') {
     // relative path.  make absolute 
     const cwd = fs.realpathSync('.');
-    dumpDir = pathTools.normalize(`${cwd}/${dumpDir}`);
+    dumpDir = path.normalize(`${cwd}/${dumpDir}`);
   }
 
   mkdirs(dumpDir);
@@ -2991,7 +2982,7 @@ function gaiaRestoreBucket(network: CLINetworkAdapter, args: string[]) : Promise
   if (dumpDir[0] !== '/') {
     // relative path.  make absolute 
     const cwd = fs.realpathSync('.');
-    dumpDir = pathTools.normalize(`${cwd}/${dumpDir}`);
+    dumpDir = path.normalize(`${cwd}/${dumpDir}`);
   }
 
   const fileList = fs.readdirSync(dumpDir);
@@ -3017,7 +3008,7 @@ function gaiaRestoreBucket(network: CLINetworkAdapter, args: string[]) : Promise
       let uploadPromise : Promise<any> = Promise.resolve();
       for (let i = 0; i < fileBatches.length; i++) {
         const uploadBatchPromises = fileBatches[i].map((fileName : string) => {
-          const filePath = pathTools.join(dumpDir, fileName);
+          const filePath = path.join(dumpDir, fileName);
           const dataBuf = fs.readFileSync(filePath);
           const gaiaPath = fileName.replace(/\\x2f/g, '/');
           return blockstack.putFile(gaiaPath, dataBuf, { encrypt: false, sign: false })
@@ -3041,7 +3032,7 @@ function gaiaRestoreBucket(network: CLINetworkAdapter, args: string[]) : Promise
  * @hubUrl (string) the URL to the write endpoint of the app's gaia hub
  * @mnemonic (string) the 12-word backup phrase, or the ciphertext of it
  */
-function gaiaSetHub(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function gaiaSetHub(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   network.setCoerceMainnetAddress(true);
 
   const blockstackID = args[0];
@@ -3064,91 +3055,90 @@ function gaiaSetHub(network: CLINetworkAdapter, args: string[]) : Promise<string
   let ownerPrivateKey : string;
   let appAddress : string;
 
-  return Promise.all([nameInfoPromise, profilePromise, mnemonicPromise])
-    .then(([nameInfo, nameProfile, mnemonic] : [NameInfoType, any, string]) => {
-      if (!nameProfile) {
-        throw new Error("No profile found");
-      }
-      if (!nameInfo) {
-        throw new Error('Name not found');
-      }
-      if (!nameInfo.zonefile) {
-        throw new Error('No zone file found');
-      }
+  const [nameInfo, nameProfile, mnemonic]: [NameInfoType, any, string] = 
+    await Promise.all([nameInfoPromise, profilePromise, mnemonicPromise]);
 
-      if (!nameProfile.apps) {
-        nameProfile.apps = {};
-      }
+  if (!nameProfile) {
+    throw new Error("No profile found");
+  }
+  if (!nameInfo) {
+    throw new Error('Name not found');
+  }
+  if (!nameInfo.zonefile) {
+    throw new Error('No zone file found');
+  }
 
-      // get owner ID-address
-      const ownerAddress = network.coerceMainnetAddress(nameInfo.address);
-      const idAddress = `ID-${ownerAddress}`;
-      
-      // get owner and app key info 
-      const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
-      const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, appKeyInfo.ownerKeyIndex);
+  if (!nameProfile.apps) {
+    nameProfile.apps = {};
+  }
 
-      // do we already have an address set for this app?
-      let existingAppAddress : string;
-      let appPrivateKey : string;
-      try {
-        existingAppAddress = getGaiaAddressFromProfile(network, nameProfile, appOrigin);
-        appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
-      }
-      catch (e) {
-        console.log(`No profile application entry for ${appOrigin}`);
-        appPrivateKey = extractAppKey(network, appKeyInfo);
-      }
-     
-      appPrivateKey = `${canonicalPrivateKey(appPrivateKey)}01`;
-      appAddress = network.coerceMainnetAddress(getPrivateKeyAddress(network, appPrivateKey));
+  // get owner ID-address
+  const ownerAddress = network.coerceMainnetAddress(nameInfo.address);
+  const idAddress = `ID-${ownerAddress}`;
+  
+  // get owner and app key info 
+  const appKeyInfo = await getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
+  const ownerKeyInfo = await getOwnerKeyInfo(network, mnemonic, appKeyInfo.ownerKeyIndex);
 
-      if (existingAppAddress && appAddress !== existingAppAddress) {
-        throw new Error(`BUG: ${existingAppAddress} !== ${appAddress}`);
-      }
+  // do we already have an address set for this app?
+  let existingAppAddress : string;
+  let appPrivateKey : string;
+  try {
+    existingAppAddress = getGaiaAddressFromProfile(network, nameProfile, appOrigin);
+    appPrivateKey = extractAppKey(network, appKeyInfo, existingAppAddress);
+  }
+  catch (e) {
+    console.log(`No profile application entry for ${appOrigin}`);
+    appPrivateKey = extractAppKey(network, appKeyInfo);
+  }
+  
+  appPrivateKey = `${canonicalPrivateKey(appPrivateKey)}01`;
+  appAddress = network.coerceMainnetAddress(getPrivateKeyAddress(network, appPrivateKey));
 
-      profile = nameProfile;
-      ownerPrivateKey = ownerKeyInfo.privateKey;
-      
-      const ownerGaiaHubPromise = gaiaConnect(network, ownerHubUrl, ownerPrivateKey);
-      const appGaiaHubPromise = gaiaConnect(network, hubUrl, appPrivateKey);
+  if (existingAppAddress && appAddress !== existingAppAddress) {
+    throw new Error(`BUG: ${existingAppAddress} !== ${appAddress}`);
+  }
 
-      return Promise.all([ownerGaiaHubPromise, appGaiaHubPromise]);
-    })
-    .then(([ownerHubConfig, appHubConfig] : [GaiaHubConfig, GaiaHubConfig]) => {
-      if (!ownerHubConfig.url_prefix) {
-        throw new Error('Invalid owner hub config: no url_prefix defined');
-      }
+  profile = nameProfile;
+  ownerPrivateKey = ownerKeyInfo.privateKey;
+  
+  const ownerGaiaHubPromise = gaiaConnect(network, ownerHubUrl, ownerPrivateKey);
+  const appGaiaHubPromise = gaiaConnect(network, hubUrl, appPrivateKey);
 
-      if (!appHubConfig.url_prefix) {
-        throw new Error('Invalid app hub config: no url_prefix defined');
-      }
+  const [ownerHubConfig, appHubConfig] : [GaiaHubConfig, GaiaHubConfig] = 
+    await Promise.all([ownerGaiaHubPromise, appGaiaHubPromise]);
 
-      const gaiaReadUrl = appHubConfig.url_prefix.replace(/\/+$/, '');
+  if (!ownerHubConfig.url_prefix) {
+    throw new Error('Invalid owner hub config: no url_prefix defined');
+  }
 
-      const newAppEntry : Record<string, string> = {};
-      newAppEntry[appOrigin] = `${gaiaReadUrl}/${appAddress}/`;
+  if (!appHubConfig.url_prefix) {
+    throw new Error('Invalid app hub config: no url_prefix defined');
+  }
 
-      const apps = Object.assign({}, profile.apps ? profile.apps : {}, newAppEntry)
-      profile.apps = apps;
+  const gaiaReadUrl = appHubConfig.url_prefix.replace(/\/+$/, '');
 
-      // sign the new profile
-      const signedProfile = makeProfileJWT(profile, ownerPrivateKey); 
-      return gaiaUploadProfileAll(
-        network, [ownerHubUrl], signedProfile, ownerPrivateKey, blockstackID);
-    })
-    .then((profileUrls : {dataUrls?: string[], error?: string}) => {
-       if (profileUrls.error) {
-          return JSONStringify({
-             error: profileUrls.error
-          });
-       }
-       else {
-          return JSONStringify({
-             profileUrls: profileUrls.dataUrls
-          });
-       }
-    });
+  const newAppEntry : Record<string, string> = {};
+  newAppEntry[appOrigin] = `${gaiaReadUrl}/${appAddress}/`;
+
+  const apps = Object.assign({}, profile.apps ? profile.apps : {}, newAppEntry)
+  profile.apps = apps;
+
+  // sign the new profile
+  const signedProfile = makeProfileJWT(profile, ownerPrivateKey); 
+  const profileUrls : {dataUrls?: string[], error?: string} = await gaiaUploadProfileAll(
+    network, [ownerHubUrl], signedProfile, ownerPrivateKey, blockstackID);
+
+    if (profileUrls.error) {
+      return JSONStringify({
+          error: profileUrls.error
+      });
+    }
+    else {
+      return JSONStringify({
+          profileUrls: profileUrls.dataUrls
+      });
+    }
 }
       
       

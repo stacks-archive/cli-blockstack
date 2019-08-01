@@ -1,7 +1,6 @@
 import logger from 'winston';
 import * as bitcoinjs from 'bitcoinjs-lib';
 import * as URL from 'url';
-import * as RIPEMD160 from 'ripemd160';
 import readline from 'readline';
 import stream from 'stream';
 import fs from 'fs';
@@ -9,11 +8,6 @@ import blockstack from 'blockstack';
 
 declare var ZoneFile : any;
 var ZoneFile = require('zone-file');
-
-import ecurve from 'ecurve';
-
-import { ECPair } from 'bitcoinjs-lib';
-const secp256k1 = ecurve.getCurveByName('secp256k1');
 
 import {
   PRIVATE_KEY_NOSIGN_PATTERN,
@@ -557,7 +551,7 @@ export function nameLookup(network: CLINetworkAdapter, name: string, includeProf
         profileUrl = blockstack.getTokenFileUrl(zonefileJSON);
       }
     }
-    catch(e) {
+    catch (e) {
       profile = null;
     }
 
@@ -679,13 +673,13 @@ export function getIDAddress(network: CLINetworkAdapter, nameOrIDAddress: string
  * Find all identity addresses until we have one that matches the given one.
  * Loops forever if not found
  */
-export function getOwnerKeyFromIDAddress(network: CLINetworkAdapter, 
+export async function getOwnerKeyFromIDAddress(network: CLINetworkAdapter, 
                                          mnemonic: string, 
                                          idAddress: string
-) : string {
+) : Promise<string> {
   let index = 0;
   while(true) {
-    const keyInfo = getOwnerKeyInfo(network, mnemonic, index);
+    const keyInfo = await getOwnerKeyInfo(network, mnemonic, index);
     if (keyInfo.idAddress === idAddress) {
       return keyInfo.privateKey;
     }
@@ -705,7 +699,7 @@ export interface IDAppKeys {
    mnemonic: string
 };
       
-export function getIDAppKeys(network: CLINetworkAdapter,
+export async function getIDAppKeys(network: CLINetworkAdapter,
                              nameOrIDAddress: string,
                              appOrigin: string,
                              mnemonicOrCiphertext: string,
@@ -715,21 +709,17 @@ export function getIDAppKeys(network: CLINetworkAdapter,
   let ownerPrivateKey : string;
   let appPrivateKey : string;
 
-  return getBackupPhrase(mnemonicOrCiphertext)
-    .then((mn : string) => {
-      mnemonic = mn;
-      return getIDAddress(network, nameOrIDAddress)
-    })
-    .then((idAddress : string) => {
-      const appKeyInfo = getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
-      appPrivateKey = extractAppKey(network, appKeyInfo);
-      ownerPrivateKey = getOwnerKeyFromIDAddress(network, mnemonic, idAddress);
-      const ret = {
-        appPrivateKey,
-        ownerPrivateKey,
-        mnemonic
-      };
-      return ret;
-    });
+  const mn : string = await getBackupPhrase(mnemonicOrCiphertext);
+  mnemonic = mn;
+  const idAddress : string = await getIDAddress(network, nameOrIDAddress);
+  const appKeyInfo = await getApplicationKeyInfo(network, mnemonic, idAddress, appOrigin);
+  appPrivateKey = extractAppKey(network, appKeyInfo);
+  ownerPrivateKey = await getOwnerKeyFromIDAddress(network, mnemonic, idAddress);
+  const ret = {
+    appPrivateKey,
+    ownerPrivateKey,
+    mnemonic
+  };
+  return ret;
 }
 

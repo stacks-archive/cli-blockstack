@@ -1,10 +1,7 @@
 import blockstack from 'blockstack';
-import * as bitcoin from 'bitcoinjs-lib';
 import * as URL from 'url';
 import crypto from 'crypto';
-
-declare var jsontokens : any;
-var jsontokens = require('jsontokens');
+import jsontokens from 'jsontokens'
 
 declare var ZoneFile : any;
 var ZoneFile = require('zone-file');

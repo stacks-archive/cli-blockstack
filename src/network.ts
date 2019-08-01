@@ -10,12 +10,6 @@ import {
    BlockstackNetwork
 } from 'blockstack/lib/network';
 
-/*
-import * as Promise from 'bluebird';
-Promise.onPossiblyUnhandledRejection(function(error : Error) {
-    throw error;
-});
- */
 
 const SATOSHIS_PER_BTC = 1e8
 

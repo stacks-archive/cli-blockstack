@@ -27,7 +27,4 @@ global['window'] = {
 
 global['localStorage'] = global['window'].localStorage
 
-// cross-fetch overrides
-import fetch from 'cross-fetch'
-
 require('.').CLIMain()
