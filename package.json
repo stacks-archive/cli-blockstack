@@ -11,7 +11,7 @@
     "compile": "rm -rf lib; babel src -d lib",
     "compile-tests": "rm -rf tests/unitTests/lib; babel tests/unitTests/src -d tests/unitTests/lib;",
     "build": "tsc",
-    "lint": "eslint src && eslint tests"
+    "lint": "eslint src --ext .ts -f unix"
   },
   "repository": {
     "type": "git",
@@ -63,24 +63,9 @@
     }
   ],
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^1.4.2",
-    "@typescript-eslint/parser": "^1.4.2",
-    "babel-cli": "^6.24.1",
-    "babel-eslint": "^6.0.4",
-    "babel-preset-env": "^1.7.0",
-    "browserify": "^16.2.3",
-    "eslint": "^2.10.2",
-    "eslint-config-airbnb": "^9.0.1",
-    "eslint-plugin-import": "^1.8.1",
-    "eslint-plugin-jsx-a11y": "^1.2.2",
-    "eslint-plugin-react": "^5.1.1",
-    "fetch-mock": "^5.5.0",
-    "mock-local-storage": "^1.0.5",
-    "nock": "^9.1.6",
-    "node-fetch": "^2.1.2",
-    "opn": "^4.0.2",
-    "proxyquire": "^1.8.0",
-    "sinon": "^4.2.1",
+    "@typescript-eslint/eslint-plugin": "^1.13.0",
+    "@typescript-eslint/parser": "^1.13.0",
+    "eslint": "^6.1.0",
     "ts-node": "^8.3.0",
     "typescript": "^3.5.3"
   },
@@ -90,6 +75,7 @@
     "@types/express": "^4.16.1",
     "@types/express-winston": "^3.0.1",
     "@types/node": "^11.13.8",
+    "@types/node-fetch": "^2.5.0",
     "@types/ripemd160": "^2.0.0",
     "ajv": "^4.11.5",
     "bip32": "^2.0.4",
@@ -101,6 +87,7 @@
     "express": "^4.16.0",
     "express-winston": "^3.1.0",
     "jsontokens": "^2.0.2",
+    "node-fetch": "^2.6.0",
     "ripemd160": "^2.0.1",
     "winston": "^3.2.1",
     "zone-file": "^0.2.2"

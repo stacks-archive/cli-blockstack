@@ -1,16 +1,18 @@
 {
-  "extends": "airbnb",
-  "parser": "babel-eslint",
-  "plugins": [],
-  "ecmaFeatures": {
-    "jsx": false,
-    "modules": true
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json",
   },
   "env": {
-    "browser": true,
     "es6": true,
-    "node": true,
+    "node": true
   },
+  "plugins": ["@typescript-eslint"],
   "rules": {
     "comma-dangle": ["error", "never"],
     "quotes": [2, "single"],
@@ -22,15 +24,36 @@
     "no-trailing-spaces": 0,
     "no-extra-boolean-cast": 0,
     "no-undef": 2,
-    "no-unused-vars": 2,
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "no-var": 2,
     "no-param-reassign": 0,
     "no-else-return": 0,
     "no-console": 0,
     "prefer-const": 2,
     "new-cap": 0,
-    "camelcase": 2,
-    "semi": [2, "never"],
-    "valid-jsdoc": ["error"]
+    "camelcase": "off",
+    "no-inner-declarations": "off",
+    "no-useless-escape": "off",
+    "no-constant-condition": "off",
+    "no-prototype-builtins": "off",
+    "no-extra-semi": "off",
+    "@typescript-eslint/member-delimiter-style": "off",
+    "semi": "off",
+    "@typescript-eslint/semi": [2, "always"],
+    "indent": "off",
+    "@typescript-eslint/indent": ["error", 2],
+    "@typescript-eslint/type-annotation-spacing": "off",
+    "@typescript-eslint/interface-name-prefix": "off",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/ban-types": "off",
+    "@typescript-eslint/no-use-before-define": "off",
+    "@typescript-eslint/explicit-member-accessibility": "off",
+    "@typescript-eslint/camelcase": "off",
+    "@typescript-eslint/class-name-casing": "off",
+    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-object-literal-type-assertion": "off",
+    "@typescript-eslint/array-type": "off",
+    "@typescript-eslint/no-explicit-any": "off"
   }
 }
