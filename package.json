@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -b ./tsconfig.json",
-    "install": "npx typescript@^3 -b ./tsconfig.json",
+    "preinstall": "npx typescript@^3 -b ./tsconfig.json",
     "lint": "eslint src --ext .ts -f unix"
   },
   "repository": {
