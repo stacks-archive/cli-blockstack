@@ -2,13 +2,13 @@
   "name": "blockstack-cli",
   "version": "1.0.0",
   "description": "Node.js Blockstack CLI",
-  "main": "./lib/index.js",
+  "main": "lib/index.js",
   "engines": {
     "node": ">=8"
   },
   "scripts": {
     "build": "tsc -b ./tsconfig.json",
-    "prepare": "npm run build",
+    "install": "npx typescript@^3 -b ./tsconfig.json",
     "lint": "eslint src --ext .ts -f unix"
   },
   "repository": {
