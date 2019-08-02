@@ -7,7 +7,7 @@
     "node": ">=8"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b ./tsconfig.json",
     "prepare": "npm run build",
     "lint": "eslint src --ext .ts -f unix"
   },
