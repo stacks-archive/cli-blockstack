@@ -13,11 +13,7 @@ You can install the CLI by cloning the repo and running `npm run build`, as
 follows:
 
 ```
-$ git clone https://github.com/blockstack/cli-blockstack
-$ cd cli-blockstack
-$ npm install
-$ npm run build
-$ sudo npm link
+$ npm install -g https://github.com/blockstack/cli-blockstack
 ```
 
 This should install `blockstack-cli` to your `$PATH`.
