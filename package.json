@@ -4,8 +4,7 @@
   "description": "Node.js Blockstack CLI",
   "main": "./lib/index.js",
   "engines": {
-    "node": ">=10",
-    "npm": ">=6"
+    "node": ">=8"
   },
   "scripts": {
     "compile": "rm -rf lib; babel src -d lib",
