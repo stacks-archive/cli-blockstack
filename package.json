@@ -7,9 +7,8 @@
     "node": ">=8"
   },
   "scripts": {
-    "compile": "rm -rf lib; babel src -d lib",
-    "compile-tests": "rm -rf tests/unitTests/lib; babel tests/unitTests/src -d tests/unitTests/lib;",
     "build": "tsc",
+    "prepare": "npm run build",
     "lint": "eslint src --ext .ts -f unix"
   },
   "repository": {
