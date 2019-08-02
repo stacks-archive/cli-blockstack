@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -b ./tsconfig.json",
-    "prepare": "npm run build",
+    "preinstall": "npm run build",
     "lint": "eslint src --ext .ts -f unix"
   },
   "repository": {
