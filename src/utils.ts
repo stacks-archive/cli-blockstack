@@ -133,7 +133,7 @@ export class SegwitP2SHKeySigner extends CLITransactionSigner {
   findUTXO(txIn: bitcoinjs.TransactionBuilder, signingIndex: number, utxos: UTXO[]) : UTXO {
     // NOTE: this is O(n*2) complexity for n UTXOs when signing an n-input transaction
     // NOTE: as of bitcoinjs-lib 4.x, the "tx" field is private
-    const private_tx = (txIn as any).__tx;
+    const private_tx = (txIn as any).__TX;
     const txidBuf = new Buffer(private_tx.ins[signingIndex].hash.slice());
     const outpoint = private_tx.ins[signingIndex].index;
     
