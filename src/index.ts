@@ -6,7 +6,8 @@ export { CLIMain } from './cli';
 // do this here, so we can be *sure* it's in RAM.
 const localStorageRAM : Record<string, any> = {};
 
-declare var global : any;
+// @ts-ignore
+declare let global : any;
 
 global['window'] = {
   location: {
@@ -25,9 +26,6 @@ global['window'] = {
   }
 };
 
-global['localStorage'] = global['window'].localStorage
+global['localStorage'] = global['window'].localStorage;
 
-// cross-fetch overrides
-import fetch from 'cross-fetch'
-
-require('.').CLIMain()
+require('.').CLIMain();

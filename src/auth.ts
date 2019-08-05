@@ -1,12 +1,8 @@
-import blockstack from 'blockstack';
-import express from 'express';
-import crypto from 'crypto';
-
-declare var jsontokens : any;
-var jsontokens = require('jsontokens');
-
-import winston from 'winston'
-import logger from 'winston'
+import * as blockstack from 'blockstack';
+import * as express from 'express';
+import * as crypto from 'crypto';
+import * as jsontokens from 'jsontokens';
+import * as logger from 'winston';
 
 import {
   gaiaConnect,
@@ -24,12 +20,11 @@ import {
 import {
   nameLookup,
   makeProfileJWT,
-  getPublicKeyFromPrivateKey,
-  canonicalPrivateKey,
+  getPublicKeyFromPrivateKey
 } from './utils';
 
 import {
-   CLINetworkAdapter
+  CLINetworkAdapter
 } from './network';
 
 import { 
@@ -71,14 +66,14 @@ pre {
   font-variant: normal; 
   font-weight: 400; 
   line-height: 18.5714px;
-}`
+}`;
 
-export const SIGNIN_HEADER = `<html><head><style>${SIGNIN_CSS}</style></head></body><h3>Blockstack CLI Sign-in</h3><br>`
-export const SIGNIN_DESC = '<p>Sign-in request for <b>"{appName}"</b></p>'
-export const SIGNIN_SCOPES = '<p>Requested scopes: <b>"{appScopes}"</b></p>'
-export const SIGNIN_FMT_NAME = '<p><a href="{authRedirect}">{blockstackID}</a> ({idAddress})</p>'
-export const SIGNIN_FMT_ID = '<p><a href="{authRedirect}">{idAddress}</a> (anonymous)</p>'
-export const SIGNIN_FOOTER = '</body></html>'
+export const SIGNIN_HEADER = `<html><head><style>${SIGNIN_CSS}</style></head></body><h3>Blockstack CLI Sign-in</h3><br>`;
+export const SIGNIN_DESC = '<p>Sign-in request for <b>"{appName}"</b></p>';
+export const SIGNIN_SCOPES = '<p>Requested scopes: <b>"{appScopes}"</b></p>';
+export const SIGNIN_FMT_NAME = '<p><a href="{authRedirect}">{blockstackID}</a> ({idAddress})</p>';
+export const SIGNIN_FMT_ID = '<p><a href="{authRedirect}">{idAddress}</a> (anonymous)</p>';
+export const SIGNIN_FOOTER = '</body></html>';
 
 export interface NamedIdentityType {
   name: string;
@@ -90,36 +85,35 @@ export interface NamedIdentityType {
 };
 
 interface AuthRequestType {
-   jti: string;
-   iat: number;
-   exp: number;
-   iss: null | string;
-   public_keys: string[];
-   domain_name: string;
-   manifest_uri: string;
-   redirect_uri: string;
-   version: string;
-   do_not_include_profile: boolean;
-   supports_hub_url: boolean;
-   scopes: string[]
+  jti: string;
+  iat: number;
+  exp: number;
+  iss: null | string;
+  public_keys: string[];
+  domain_name: string;
+  manifest_uri: string;
+  redirect_uri: string;
+  version: string;
+  do_not_include_profile: boolean;
+  supports_hub_url: boolean;
+  scopes: string[]
 };
 
 
 // new ecdsa private key each time
 const authTransitKey = crypto.randomBytes(32).toString('hex');
-const authTransitPubkey = getPublicKeyFromPrivateKey(authTransitKey);
 const authTransitNonce = crypto.randomBytes(32).toString('hex');
 
 
 /*
  * Get the app private key
  */
-function getAppPrivateKey(network: CLINetworkAdapter,
-                          mnemonic: string,
-                          id: NamedIdentityType,
-                          appOrigin: string
-): string {
-  const appKeyInfo = getApplicationKeyInfo(network, mnemonic, id.idAddress, appOrigin, id.index);
+async function getAppPrivateKey(network: CLINetworkAdapter,
+  mnemonic: string,
+  id: NamedIdentityType,
+  appOrigin: string
+): Promise<string> {
+  const appKeyInfo = await getApplicationKeyInfo(network, mnemonic, id.idAddress, appOrigin, id.index);
   let appPrivateKey;
   try {
     const existingAppAddress = getGaiaAddressFromProfile(network, id.profile, appOrigin);
@@ -135,18 +129,17 @@ function getAppPrivateKey(network: CLINetworkAdapter,
 /*
  * Make a sign-in link
  */
-function makeSignInLink(network: CLINetworkAdapter,
-                        authPort: number,
-                        mnemonic: string,
-                        authRequest: AuthRequestType,
-                        hubUrl: string,
-                        id: NamedIdentityType) : string {
+async function makeSignInLink(network: CLINetworkAdapter,
+  authPort: number,
+  mnemonic: string,
+  authRequest: AuthRequestType,
+  hubUrl: string,
+  id: NamedIdentityType) : Promise<string> {
   
   const appOrigin = authRequest.domain_name;
-  const appKeyInfo = getApplicationKeyInfo(network, mnemonic, id.idAddress, appOrigin, id.index);
-  const appPrivateKey = getAppPrivateKey(network, mnemonic, id, appOrigin);
+  const appPrivateKey = await getAppPrivateKey(network, mnemonic, id, appOrigin);
 
-  const associationToken = makeAssociationToken(appPrivateKey, id.privateKey)
+  const associationToken = makeAssociationToken(appPrivateKey, id.privateKey);
   const authResponseTmp = blockstack.makeAuthResponse(
     id.privateKey,
     {},
@@ -163,11 +156,11 @@ function makeSignInLink(network: CLINetworkAdapter,
 
   // pass along some helpful data from the authRequest
   const authResponsePayload = jsontokens.decodeToken(authResponseTmp).payload;
-  let id_public = Object.assign({}, id);
+  const id_public = Object.assign({}, id);
   id_public.profile = {};
   id_public.privateKey = undefined;
-    
-  authResponsePayload.metadata = {
+  
+  (authResponsePayload as any).metadata = {
     id: id_public,
     profileUrl: id.profileUrl,
     appOrigin: appOrigin,
@@ -188,31 +181,31 @@ function makeSignInLink(network: CLINetworkAdapter,
 /*
  * Make the sign-in page
  */
-function makeAuthPage(network: CLINetworkAdapter,
-                      authPort: number,
-                      mnemonic: string,
-                      hubUrl: string,
-                      manifest: any,
-                      authRequest: AuthRequestType,
-                      ids: Array<NamedIdentityType>
-) : string {
+async function makeAuthPage(network: CLINetworkAdapter,
+  authPort: number,
+  mnemonic: string,
+  hubUrl: string,
+  manifest: any,
+  authRequest: AuthRequestType,
+  ids: Array<NamedIdentityType>
+) : Promise<string> {
 
-  let signinBody = SIGNIN_HEADER
-  let signinDescription = SIGNIN_DESC
-    .replace(/{appName}/, manifest.name || "(Unknown app)");
+  let signinBody = SIGNIN_HEADER;
+  const signinDescription = SIGNIN_DESC
+    .replace(/{appName}/, manifest.name || '(Unknown app)');
 
-  let signinScopes = SIGNIN_SCOPES
+  const signinScopes = SIGNIN_SCOPES
     .replace(/{appScopes}/, authRequest.scopes.length > 0
-                            ? authRequest.scopes.join(", ")
-                            : "(none)");
+      ? authRequest.scopes.join(', ')
+      : '(none)');
 
-  signinBody = `${signinBody}${signinDescription}${signinScopes}`
+  signinBody = `${signinBody}${signinDescription}${signinScopes}`;
 
   for (let i = 0; i < ids.length; i++) {
-    let signinEntry
+    let signinEntry;
     if (ids[i].name) {
       signinEntry = SIGNIN_FMT_NAME
-        .replace(/{authRedirect}/, makeSignInLink(
+        .replace(/{authRedirect}/, await makeSignInLink(
           network,
           authPort,
           mnemonic,
@@ -224,7 +217,7 @@ function makeAuthPage(network: CLINetworkAdapter,
     }
     else {
       signinEntry = SIGNIN_FMT_ID
-        .replace(/{authRedirect}/, makeSignInLink(
+        .replace(/{authRedirect}/, await makeSignInLink(
           network,
           authPort,
           mnemonic,
@@ -246,35 +239,34 @@ function makeAuthPage(network: CLINetworkAdapter,
  * Find all identity addresses that have names attached to them.
  * Fills in identities.
  */
-function loadNamedIdentitiesLoop(network: CLINetworkAdapter, 
-                                 mnemonic: string, 
-                                 index: number, 
-                                 identities: NamedIdentityType[]) : Promise<NamedIdentityType[]> {
+async function loadNamedIdentitiesLoop(network: CLINetworkAdapter, 
+  mnemonic: string, 
+  index: number, 
+  identities: NamedIdentityType[]) : Promise<NamedIdentityType[]> {
 
   // 65536 is a ridiculously huge number
   if (index > 65536) {
-    throw new Error('Too many names')
+    throw new Error('Too many names');
   }
 
-  const keyInfo = getOwnerKeyInfo(network, mnemonic, index);
-  return network.getNamesOwned(keyInfo.idAddress.slice(3))
-    .then((nameList) => {
-      if (nameList.length === 0) {
-        // out of names 
-        return identities;
-      }
-      for (let i = 0; i < nameList.length; i++) {
-        identities.push({
-          name: nameList[i],
-          idAddress: keyInfo.idAddress,
-          privateKey: keyInfo.privateKey,
-          index: index,
-          profile: {},
-          profileUrl: ''
-        } as NamedIdentityType);
-      }
-      return loadNamedIdentitiesLoop(network, mnemonic, index + 1, identities);
-    });
+  const keyInfo = await getOwnerKeyInfo(network, mnemonic, index);
+  const nameList = await network.getNamesOwned(keyInfo.idAddress.slice(3));
+  if (nameList.length === 0) {
+    // out of names 
+    return identities;
+  }
+  for (let i = 0; i < nameList.length; i++) {
+    const identity: NamedIdentityType = {
+      name: nameList[i],
+      idAddress: keyInfo.idAddress,
+      privateKey: keyInfo.privateKey,
+      index: index,
+      profile: {},
+      profileUrl: ''
+    };
+    identities.push(identity);
+  }
+  return await loadNamedIdentitiesLoop(network, mnemonic, index + 1, identities);
 }
 
 /*
@@ -290,8 +282,8 @@ export function loadNamedIdentities(network: CLINetworkAdapter, mnemonic: string
 /*
  * Generate identity info for an unnamed ID
  */
-function loadUnnamedIdentity(network: CLINetworkAdapter, mnemonic: string, index: number): NamedIdentityType {
-  const keyInfo = getOwnerKeyInfo(network, mnemonic, index);
+async function loadUnnamedIdentity(network: CLINetworkAdapter, mnemonic: string, index: number): Promise<NamedIdentityType> {
+  const keyInfo = await getOwnerKeyInfo(network, mnemonic, index);
   const idInfo = {
     name: '',
     idAddress: keyInfo.idAddress,
@@ -308,9 +300,9 @@ function loadUnnamedIdentity(network: CLINetworkAdapter, mnemonic: string, index
  */
 function sendJSON(res: express.Response, data: Object, statusCode: number) {
   logger.info(`Respond ${statusCode}: ${JSON.stringify(data)}`);
-  res.writeHead(statusCode, {'Content-Type' : 'application/json'})
-  res.write(JSON.stringify(data))
-  res.end()
+  res.writeHead(statusCode, {'Content-Type' : 'application/json'});
+  res.write(JSON.stringify(data));
+  res.end();
 }
 
 
@@ -320,56 +312,51 @@ function sendJSON(res: express.Response, data: Object, statusCode: number) {
  *
  * NOTE: should be the *only* promise chain running!
  */
-function getIdentityInfo(network: CLINetworkAdapter, mnemonic: string, appGaiaHub: string, profileGaiaHub: string) 
+async function getIdentityInfo(network: CLINetworkAdapter, mnemonic: string, _appGaiaHub: string, _profileGaiaHub: string) 
   : Promise<NamedIdentityType[]> {
 
-  let identities : NamedIdentityType[] = [];
   network.setCoerceMainnetAddress(true);    // for lookups in regtest
-  
-  // load up all of our identity addresses and profile URLs
-  const identitiesPromise = loadNamedIdentities(network, mnemonic)
-    .then((ids) => {
-      const nameInfoPromises = [];
-      for (let i = 0; i < ids.length; i++) {
-        const nameInfoPromise = nameLookup(network, ids[i].name, true)
-          .catch(() => null);
+  let identities : NamedIdentityType[];
 
-        nameInfoPromises.push(nameInfoPromise);
-      }
-
-      identities = ids;
-      return Promise.all(nameInfoPromises);
-    })
-    .then((nameDatas) => {
-      network.setCoerceMainnetAddress(false);
-      nameDatas = nameDatas.filter((p) => p !== null && p !== undefined);
-
-      for (let i = 0; i < nameDatas.length; i++) {
-        if (nameDatas[i].hasOwnProperty('error') && nameDatas[i].error) {
-          // no data for this name 
-          identities[i].profileUrl = '';
-        }
-        else {
-          identities[i].profileUrl = nameDatas[i].profileUrl;
-          identities[i].profile = nameDatas[i].profile;
-        }
-      }
-
-      const nextIndex = identities.length + 1
-
-      // ignore identities with no data
-      identities = identities.filter((id) => !!id.profileUrl);
-
-      // add in the next non-named identity
-      identities.push(loadUnnamedIdentity(network, mnemonic, nextIndex))
-      return identities;
-    })
-    .catch((e) => {
-      network.setCoerceMainnetAddress(false);
-      throw e;
+  try {
+    // load up all of our identity addresses and profile URLs
+    identities = await loadNamedIdentities(network, mnemonic);
+    const nameInfoPromises = identities.map(id => {
+      const lookup: Promise<{ profile: any, profileUrl?: string, zonefile?: string } | null> =
+        nameLookup(network, id.name, true).catch(() => null);
+      return lookup;
     });
 
-  return identitiesPromise;
+    let nameDatas = await Promise.all(nameInfoPromises);
+
+    network.setCoerceMainnetAddress(false);
+    nameDatas = nameDatas.filter((p) => p !== null && p !== undefined);
+
+    for (let i = 0; i < nameDatas.length; i++) {
+      if (nameDatas[i].hasOwnProperty('error') && (nameDatas[i] as any).error) {
+        // no data for this name 
+        identities[i].profileUrl = '';
+      }
+      else {
+        identities[i].profileUrl = nameDatas[i].profileUrl;
+        identities[i].profile = nameDatas[i].profile;
+      }
+    }
+
+    const nextIndex = identities.length + 1;
+
+    // ignore identities with no data
+    identities = identities.filter((id) => !!id.profileUrl);
+
+    // add in the next non-named identity
+    identities.push(await loadUnnamedIdentity(network, mnemonic, nextIndex));
+
+  } catch(e) {
+    network.setCoerceMainnetAddress(false);
+    throw e;
+  }
+
+  return identities;
 }
 
 
@@ -383,65 +370,64 @@ function getIdentityInfo(network: CLINetworkAdapter, mnemonic: string, appGaiaHu
  *
  * NOTE: should be the *only* promise chain running!
  */
-export function handleAuth(network: CLINetworkAdapter,
-                           mnemonic: string,
-                           gaiaHubUrl: string,
-                           profileGaiaHub: string,
-                           port: number, 
-                           req: express.Request,
-                           res: express.Response
+export async function handleAuth(network: CLINetworkAdapter,
+  mnemonic: string,
+  gaiaHubUrl: string,
+  profileGaiaHub: string,
+  port: number, 
+  req: express.Request,
+  res: express.Response
 ) : Promise<any> {
 
   const authToken = req.query.authRequest;
   if (!authToken) {
-     return Promise.resolve().then(() => {
-       sendJSON(res, { error: 'No authRequest given' }, 400);
-     });
+    return Promise.resolve().then(() => {
+      sendJSON(res, { error: 'No authRequest given' }, 400);
+    });
   }
  
-  let errorMsg : string = '';
+  let errorMsg  = '';
   let identities : NamedIdentityType[] = [];
-  return getIdentityInfo(network, mnemonic, gaiaHubUrl, profileGaiaHub)
-    .then((ids) => {
-      identities = ids;
-      errorMsg = 'Unable to verify authentication token';
-      return blockstack.verifyAuthRequest(authToken);
-    })
-    .then((valid) => {
-      if (!valid) {
-        errorMsg = 'Invalid authentication token: could not verify';
-        throw new Error(errorMsg);
-      }
-      errorMsg = 'Unable to fetch app manifest';
-      return blockstack.fetchAppManifest(authToken);
-    })
-    .then((appManifest) => {
-      const decodedAuthToken = jsontokens.decodeToken(authToken);
-      const decodedAuthPayload = decodedAuthToken.payload;
-      if (!decodedAuthPayload) {
-        errorMsg = 'Invalid authentication token: no payload';
-        throw new Error(errorMsg);
-      }
 
-      // make sign-in page
-      const authPage = makeAuthPage(
-        network, port, mnemonic, gaiaHubUrl, appManifest, decodedAuthPayload, identities);
+  try {
+    identities = await getIdentityInfo(network, mnemonic, gaiaHubUrl, profileGaiaHub);
 
-      res.writeHead(200, {'Content-Type': 'text/html', 'Content-Length': authPage.length});
-      res.write(authPage);
-      res.end();
-      return;
-    })
-    .catch((e) => {
-      if (!errorMsg) {
-        errorMsg = e.message;
-      }
+    errorMsg = 'Unable to verify authentication token';
+    const valid = blockstack.verifyAuthRequest(authToken);
+        
+    if (!valid) {
+      errorMsg = 'Invalid authentication token: could not verify';
+      throw new Error(errorMsg);
+    }
+    errorMsg = 'Unable to fetch app manifest';
+    const appManifest = await blockstack.fetchAppManifest(authToken);
 
-      logger.error(e)
-      logger.error(errorMsg)
-      sendJSON(res, { error: `Unable to authenticate app request: ${errorMsg}` }, 400);
-      return;
-    });
+    errorMsg = 'Unable to decode token';
+    const decodedAuthToken = jsontokens.decodeToken(authToken);
+    const decodedAuthPayload = decodedAuthToken.payload;
+    if (!decodedAuthPayload) {
+      errorMsg = 'Invalid authentication token: no payload';
+      throw new Error(errorMsg);
+    }
+
+    errorMsg = 'Unable to make auth page';
+
+    // make sign-in page
+    const authPage = await makeAuthPage(
+      network, port, mnemonic, gaiaHubUrl, appManifest, decodedAuthPayload as AuthRequestType, identities);
+
+    res.writeHead(200, {'Content-Type': 'text/html', 'Content-Length': authPage.length});
+    res.write(authPage);
+    res.end();
+  } catch (e) {
+    if (!errorMsg) {
+      errorMsg = e.message;
+    }
+
+    console.log(e.stack);
+    logger.error(errorMsg);
+    sendJSON(res, { error: `Unable to authenticate app request: ${errorMsg}` }, 400);
+  }
 }
 
 /*
@@ -449,10 +435,10 @@ export function handleAuth(network: CLINetworkAdapter,
  * Indicates whether or not the profile was changed.
  */
 function updateProfileApps(network: CLINetworkAdapter, 
-                          id: NamedIdentityType, 
-                          appOrigin: string, 
-                          appGaiaConfig: GaiaHubConfig,
-                          profile?: any
+  id: NamedIdentityType, 
+  appOrigin: string, 
+  appGaiaConfig: GaiaHubConfig,
+  profile?: any
 ): Promise<{ profile: any, changed: boolean }> {
 
   let needProfileUpdate = false;
@@ -461,7 +447,7 @@ function updateProfileApps(network: CLINetworkAdapter,
   const profilePromise = Promise.resolve().then(() => {
     if (profile === null || profile === undefined) {
       return nameLookup(network, id.name)
-        .catch((e) => null);
+        .catch((_e) => null);
     } else {
       return { profile: profile };
     }
@@ -480,7 +466,7 @@ function updateProfileApps(network: CLINetworkAdapter,
       profile = {
         'type': '@Person',
         'account': [],
-        'apps': {},
+        'apps': {}
       };
     }
 
@@ -510,7 +496,7 @@ function updateProfileApps(network: CLINetworkAdapter,
     }
 
     return { profile, changed: needProfileUpdate };
-  })
+  });
 }
 
 /*
@@ -518,9 +504,9 @@ function updateProfileApps(network: CLINetworkAdapter,
  * Indicates whether or not the profile data changed.
  */
 function updateProfileAPISettings(network: CLINetworkAdapter,
-                                  id: NamedIdentityType,
-                                  appGaiaConfig: GaiaHubConfig,
-                                  profile?: any
+  id: NamedIdentityType,
+  appGaiaConfig: GaiaHubConfig,
+  profile?: any
 ): Promise<{ profile: any, changed: boolean }> {
 
   let needProfileUpdate = false;
@@ -529,7 +515,7 @@ function updateProfileAPISettings(network: CLINetworkAdapter,
   const profilePromise = Promise.resolve().then(() => {
     if (profile === null || profile === undefined) {
       return nameLookup(network, id.name)
-        .catch((e) => null);
+        .catch((_e) => null);
     }
     else {
       return { profile: profile };
@@ -549,7 +535,7 @@ function updateProfileAPISettings(network: CLINetworkAdapter,
       profile = {
         'type': '@Person',
         'account': [],
-        'api': {},
+        'api': {}
       };
     }
 
@@ -581,7 +567,7 @@ function updateProfileAPISettings(network: CLINetworkAdapter,
     }
 
     return { profile, changed: needProfileUpdate };
-  })
+  });
 }
 
 /*
@@ -597,12 +583,12 @@ function updateProfileAPISettings(network: CLINetworkAdapter,
  * Sends the user an error page on failure.
  * Returns a Promise that resolves to nothing.
  */
-export function handleSignIn(network: CLINetworkAdapter, 
-                             mnemonic: string,
-                             appGaiaHub: string, 
-                             profileGaiaHub: string,
-                             req: express.Request, 
-                             res: express.Response
+export async function handleSignIn(network: CLINetworkAdapter, 
+  mnemonic: string,
+  appGaiaHub: string, 
+  profileGaiaHub: string,
+  req: express.Request, 
+  res: express.Response
 ): Promise<any> {
   
   const authResponseQP = req.query.authResponse;
@@ -613,7 +599,7 @@ export function handleSignIn(network: CLINetworkAdapter,
   }
   const nameLookupUrl = `${network.blockstackAPIUrl}/v1/names/`;
 
-  let errorMsg : string = '';
+  let errorMsg = '';
   let errorStatusCode = 400;
   let authResponsePayload : any;
     
@@ -627,10 +613,8 @@ export function handleSignIn(network: CLINetworkAdapter,
   let needProfileAPIUpdate = false;
   let profileAPIUpdate : boolean;
 
-  return Promise.resolve().then(() => {
-    return blockstack.verifyAuthResponse(authResponseQP, nameLookupUrl);
-  })
-  .then((valid) => {
+  try {
+    const valid = await blockstack.verifyAuthResponse(authResponseQP, nameLookupUrl);
     if (!valid) {
       errorMsg = `Unable to verify authResponse token ${authResponseQP}`;
       throw new Error(errorMsg);
@@ -647,13 +631,13 @@ export function handleSignIn(network: CLINetworkAdapter,
     const nonce = authResponsePayload.metadata.nonce;
 
     if (nonce != authTransitNonce) {
-      throw new Error('Invalid auth response: not generated by this authenticator')
+      throw new Error('Invalid auth response: not generated by this authenticator');
     }
 
     // restore
-    id.privateKey = getOwnerKeyInfo(network, mnemonic, id.index).privateKey;
+    id.privateKey = (await getOwnerKeyInfo(network, mnemonic, id.index)).privateKey;
 
-    const appPrivateKey = getAppPrivateKey(network, mnemonic, id, appOrigin);
+    const appPrivateKey = await getAppPrivateKey(network, mnemonic, id, appOrigin);
 
     // remove sensitive (CLI-specific) information
     authResponsePayload.metadata = {
@@ -665,44 +649,42 @@ export function handleSignIn(network: CLINetworkAdapter,
     logger.debug(`App ${appOrigin} requests scopes ${JSON.stringify(scopes)}`);
 
     // connect to the app gaia hub
-    return gaiaConnect(network, appGaiaHub, appPrivateKey);
-  })
-  .then((appHubConfig) => {
+    const appHubConfig = await gaiaConnect(network, appGaiaHub, appPrivateKey);
+
     hubConfig = appHubConfig;
-    return updateProfileAPISettings(network, id, hubConfig);
-  })
-  .then((newProfileData) => {
+    let newProfileData = await updateProfileAPISettings(network, id, hubConfig);
+
     needProfileAPIUpdate = newProfileData.changed;
     profileAPIUpdate = newProfileData.profile;
-    return updateProfileApps(network, id, appOrigin, hubConfig, profileAPIUpdate);
-  })
-  .then((newProfileData) => {
+    newProfileData = await updateProfileApps(network, id, appOrigin, hubConfig, profileAPIUpdate);
+
     const profile = newProfileData.profile;
     const needProfileSigninUpdate = newProfileData.changed && scopes.includes('store_write');
 
     logger.debug(`Resulting profile for ${id.name} is ${JSON.stringify(profile)}`);
+
+    let gaiaUrls: any;
 
     // sign and replicate new profile if we need to.
     // otherwise do nothing 
     if (needProfileSigninUpdate) {
       logger.debug(`Upload new profile with new sign-in data to ${profileGaiaHub}`);
       const profileJWT = makeProfileJWT(profile, id.privateKey);
-      return gaiaUploadProfileAll(
+      gaiaUrls = await gaiaUploadProfileAll(
         network, [profileGaiaHub], profileJWT, id.privateKey, id.name);
     }
     else if (needProfileAPIUpdate) {
       // API settings changed, but we won't be adding an app entry
       logger.debug(`Upload new profile with new API settings to ${profileGaiaHub}`);
       const profileJWT = makeProfileJWT(profileAPIUpdate, id.privateKey);
-      return gaiaUploadProfileAll(
+      gaiaUrls = await gaiaUploadProfileAll(
         network, [profileGaiaHub], profileJWT, id.privateKey, id.name);
     }
     else {
       logger.debug(`Gaia read URL for ${appOrigin} is ${profile.apps[appOrigin]}`);
-      return { dataUrls: [], error: null };
+      gaiaUrls = { dataUrls: [], error: null };
     }
-  })
-  .then((gaiaUrls) => {
+
     if (gaiaUrls.hasOwnProperty('error') && gaiaUrls.error) {
       errorMsg = `Failed to upload new profile: ${gaiaUrls.error}`;
       errorStatusCode = 502;
@@ -717,12 +699,10 @@ export function handleSignIn(network: CLINetworkAdapter,
     logger.info(`Redirect to ${appUri}`);
     res.writeHead(302, {'Location': appUri});
     res.end();
-    return;
-  })
-  .catch((e) => {
+
+  } catch(e) {
     logger.error(e);
     logger.error(errorMsg);
     sendJSON(res, { error: `Unable to process signin request: ${errorMsg}` }, errorStatusCode);
-    return;
-  });
+  }
 }

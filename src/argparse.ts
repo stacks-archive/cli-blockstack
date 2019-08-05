@@ -1,11 +1,6 @@
-import Ajv from 'ajv';
-import process from 'process';
-
-declare var c32check : any;
-var c32check = require('c32check');
-
-import os from 'os';
-import fs from 'fs';
+import * as Ajv from 'ajv';
+import * as process from 'process';
+import * as fs from 'fs';
 
 export const NAME_PATTERN = 
   '^([0-9a-z_.+-]{3,37})$';
@@ -42,44 +37,44 @@ export const PRIVATE_KEY_MULTISIG_PATTERN =
 
 // segwit:p2sh:m,pk1,pk2,...,pkn
 export const PRIVATE_KEY_SEGWIT_P2SH_PATTERN =
-  `^segwit:p2sh:([0-9]+),([0-9a-f]{64,66},)*([0-9a-f]{64,66})$`;
+  '^segwit:p2sh:([0-9]+),([0-9a-f]{64,66},)*([0-9a-f]{64,66})$';
 
 // any private key pattern we support 
 export const PRIVATE_KEY_PATTERN_ANY = 
   `${PRIVATE_KEY_PATTERN}|${PRIVATE_KEY_MULTISIG_PATTERN}|${PRIVATE_KEY_SEGWIT_P2SH_PATTERN}|${PRIVATE_KEY_NOSIGN_PATTERN}`;
 
 export const PUBLIC_KEY_PATTERN = 
-  '^([0-9a-f]{66,130})$'
+  '^([0-9a-f]{66,130})$';
 
-export const INT_PATTERN = '^-?[0-9]+$'
+export const INT_PATTERN = '^-?[0-9]+$';
 
-export const ZONEFILE_HASH_PATTERN = '^([0-9a-f]{40})$'
+export const ZONEFILE_HASH_PATTERN = '^([0-9a-f]{40})$';
 
-export const URL_PATTERN = "^http[s]?://.+$"
+export const URL_PATTERN = '^http[s]?://.+$';
 
 export const SUBDOMAIN_PATTERN =
-  '^([0-9a-z_+-]{1,37})\.([0-9a-z_.+-]{3,37})$'
+  '^([0-9a-z_+-]{1,37})\.([0-9a-z_.+-]{3,37})$';
 
 export const TXID_PATTERN = 
-  '^([0-9a-f]{64})$'
+  '^([0-9a-f]{64})$';
 
-export const BOOLEAN_PATTERN = '^(0|1|true|false)$'
+export const BOOLEAN_PATTERN = '^(0|1|true|false)$';
 
 export interface CLI_LOG_CONFIG_TYPE {
-   level: string,
-   handleExceptions: boolean,
-   timestamp: boolean,
-   stringify: boolean,
-   colorize: boolean,
-   json: boolean
+  level: string,
+  handleExceptions: boolean,
+  timestamp: boolean,
+  stringify: boolean,
+  colorize: boolean,
+  json: boolean
 };
 
 export interface CLI_CONFIG_TYPE {
-   blockstackAPIUrl: string,
-   blockstackNodeUrl: string,
-   broadcastServiceUrl: string,
-   utxoServiceUrl: string,
-   logConfig: CLI_LOG_CONFIG_TYPE
+  blockstackAPIUrl: string,
+  blockstackNodeUrl: string,
+  broadcastServiceUrl: string,
+  utxoServiceUrl: string,
+  logConfig: CLI_LOG_CONFIG_TYPE
 };
 
 const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
@@ -89,7 +84,7 @@ const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
   stringify: true,
   colorize: true,
   json: true
-}
+};
 
 const CONFIG_DEFAULTS : CLI_CONFIG_TYPE = {
   blockstackAPIUrl: 'https://core.blockstack.org',
@@ -117,29 +112,29 @@ const CONFIG_TESTNET_DEFAULTS = {
   logConfig: Object.assign({}, LOG_CONFIG_DEFAULTS, { level: 'debug' })
 };
 
-export const DEFAULT_CONFIG_PATH = '~/.blockstack-cli.conf'
-export const DEFAULT_CONFIG_REGTEST_PATH = '~/.blockstack-cli-regtest.conf'
-export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf'
+export const DEFAULT_CONFIG_PATH = '~/.blockstack-cli.conf';
+export const DEFAULT_CONFIG_REGTEST_PATH = '~/.blockstack-cli-regtest.conf';
+export const DEFAULT_CONFIG_TESTNET_PATH = '~/.blockstack-cli-testnet.conf';
 
-export const DEFAULT_MAX_ID_SEARCH_INDEX = 256
+export const DEFAULT_MAX_ID_SEARCH_INDEX = 256;
 
 interface CLI_PROP_ITEM {
- name: string;
- type: 'string';
- realtype: string;
- pattern?: string;
+  name: string;
+  type: 'string';
+  realtype: string;
+  pattern?: string;
 }
 
 
 interface CLI_PROP {
- [index: string]: {
-   type: "array",
-   items: CLI_PROP_ITEM[]
-   minItems: number,
-   maxItems: number,
-   help: string,
-   group: string
- }
+  [index: string]: {
+    type: 'array',
+    items: CLI_PROP_ITEM[]
+    minItems: number,
+    maxItems: number,
+    help: string,
+    group: string
+  }
 }
 
 // CLI usage
@@ -147,20 +142,20 @@ export const CLI_ARGS = {
   type: 'object',
   properties: {
     announce: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'message_hash',
-          type: "string",
+          type: 'string',
           realtype: 'zonefile_hash',
-          pattern: ZONEFILE_HASH_PATTERN,
+          pattern: ZONEFILE_HASH_PATTERN
         },
         {
           name: 'owner_key',
-          type: "string",
+          type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 2,
       maxItems: 2,
@@ -186,32 +181,32 @@ export const CLI_ARGS = {
       group: 'Peer Services'
     },
     authenticator: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'app_gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'backup_phrase',
           type: 'string',
           realtype: '12_words_or_ciphertext',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'profile_gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'port',
           type: 'string',
           realtype: 'portnum',
-          pattern: '^[0-9]+',
-        },
+          pattern: '^[0-9]+'
+        }
       ],
       minItems: 2,
       maxItems: 4,
@@ -230,16 +225,16 @@ export const CLI_ARGS = {
       '    $ blockstack-cli authenticator "$APP_GAIA_HUB" "$BACKUP_PHRASE" "$PROFILE_GAIA_HUB" 8888\n' +
       '    Press Ctrl+C to exit\n' +
       '    Authentication server started on 8888\n',
-      group: 'Authentication',
+      group: 'Authentication'
     },
     balance: {
-      type: "array",
+      type: 'array',
       items: [ 
         {
           name: 'address',
-          type: "string",
+          type: 'string',
           realtype: 'address',
-          pattern: `${ADDRESS_PATTERN}|${STACKS_ADDRESS_PATTERN}`,
+          pattern: `${ADDRESS_PATTERN}|${STACKS_ADDRESS_PATTERN}`
         }
       ],
       minItems: 1,
@@ -260,17 +255,17 @@ export const CLI_ARGS = {
       '      "BTC": "123456"\n' +
       '      "STACKS": "123456"\n' +
       '    }\n',
-      group: 'Account Management',
+      group: 'Account Management'
     },
     convert_address: {
-      type: "array",
+      type: 'array',
       items: [
         {
-          name: "address",
-          type: "string",
-          realtype: "address",
+          name: 'address',
+          type: 'string',
+          realtype: 'address',
           pattern: `${ADDRESS_PATTERN}|${STACKS_ADDRESS_PATTERN}`
-        },
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -288,23 +283,23 @@ export const CLI_ARGS = {
       '      "STACKS": "SPA2MZWV9N67TBYVWTE0PSSKMJ2F6YXW7CBE6YPW",\n' +
       '      "BTC": "12qdRgXxgNBNPnDeEChy3fYTbSHQ8nfZfD"\n' +
       '    }\n',
-      group: 'Account Management',
+      group: 'Account Management'
     },
     decrypt_keychain: {
-      type: "array",
+      type: 'array',
       items: [
         {
-          name: "encrypted_backup_phrase",
-          type: "string",
-          realtype: "encrypted_backup_phrase",
-          pattern: "^[^ ]+$",
+          name: 'encrypted_backup_phrase',
+          type: 'string',
+          realtype: 'encrypted_backup_phrase',
+          pattern: '^[^ ]+$'
         },
         {
           name: 'password',
           type: 'string',
           realtype: 'password',
-          pattern: '.+',
-        },
+          pattern: '.+'
+        }
       ],
       minItems: 1,
       maxItems: 2,
@@ -317,43 +312,43 @@ export const CLI_ARGS = {
       '    $ blockstack-cli decrypt_keychain "bfMDtOucUGcJXjZo6vkrZWgEzue9fzPsZ7A6Pl4LQuxLI1xsVF0VPgBkMsnSLCmYS5YHh7R3mNtMmX45Bq9sNGPfPsseQMR0fD9XaHi+tBg=\n' +
       '    Enter password:\n' +
       '    section amount spend resemble spray verify night immune tattoo best emotion parrot',
-      group: "Key Management",
+      group: 'Key Management'
     },
     docs: {
-      type: "array",
+      type: 'array',
       items: [
         {
-          name: "format",
-          type: "string",
-          realtype: "output_format",
-          pattern: "^json$"
+          name: 'format',
+          type: 'string',
+          realtype: 'output_format',
+          pattern: '^json$'
         }
       ],
       minItems: 0,
       maxItems: 1,
-      help: "Dump the documentation for all commands as JSON to standard out.",
-      group: "CLI"
+      help: 'Dump the documentation for all commands as JSON to standard out.',
+      group: 'CLI'
     },
     encrypt_keychain: {
-      type: "array",
+      type: 'array',
       items: [
         {
-          name: "backup_phrase",
-          type: "string",
-          realtype: "backup_phrase",
-          pattern: ".+",
+          name: 'backup_phrase',
+          type: 'string',
+          realtype: 'backup_phrase',
+          pattern: '.+'
         },
         {
           name: 'password',
           type: 'string',
           realtype: 'password',
-          pattern: '.+',
-        },
+          pattern: '.+'
+        }
       ],
       minItems: 1,
       maxItems: 2,
-      help: "Encrypt a 12-word backup phrase, which can be decrypted later with the " +
-      "decrypt_backup_phrase command.  The password will be prompted if not given.\n" +
+      help: 'Encrypt a 12-word backup phrase, which can be decrypted later with the ' +
+      'decrypt_backup_phrase command.  The password will be prompted if not given.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -362,10 +357,10 @@ export const CLI_ARGS = {
       '     Enter password:\n' +
       '     Enter password again:\n' +
       '     M+DnBHYb1fgw4N3oZ+5uTEAua5bAWkgTW/SjmmBhGGbJtjOtqVV+RrLJEJOgT35hBon4WKdGWye2vTdgqDo7+HIobwJwkQtN2YF9g3zPsKk=',
-      group: "Key Management",
+      group: 'Key Management'
     },
     gaia_dump_bucket: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'name_or_id_address',
@@ -377,24 +372,24 @@ export const CLI_ARGS = {
           name: 'app_origin',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'backup_phrase',
           type: 'string',
-          realtype: '12_words_or_ciphertext',
+          realtype: '12_words_or_ciphertext'
         },
         {
           name: 'dump_dir',
           type: 'string',
           realtype: 'path',
-          pattern: '.+',
+          pattern: '.+'
         }
       ],
       minItems: 5,
@@ -412,47 +407,47 @@ export const CLI_ARGS = {
       '    Download dir/format to ./backups/dir\\x2fformat\n' +
       '    Download /.dotfile to ./backups/\\x2f.dotfile\n' +
       '    3\n',
-      group: "Gaia",
+      group: 'Gaia'
     },
     gaia_getfile: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'blockstack_id',
-          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
+          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
         },
         {
           name: 'app_origin',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'filename',
           type: 'string',
           realtype: 'filename',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'app_private_key',
           type: 'string',
           realtype: 'private_key',
-          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN,
+          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN
         },
         {
           name: 'decrypt',
           type: 'string',
           realtype: 'boolean',
-          pattern: BOOLEAN_PATTERN,
+          pattern: BOOLEAN_PATTERN
         },
         {
           name: 'verify',
           type: 'string',
           realtype: 'boolean',
-          pattern: BOOLEAN_PATTERN,
-        },
+          pattern: BOOLEAN_PATTERN
+        }
       ],
       minItems: 3,
       maxItems: 6,
@@ -484,47 +479,47 @@ export const CLI_ARGS = {
       '    $ # Tip: You can obtain the app key with the get_app_keys command\n' +
       '    $ export APP_KEY="3ac770e8c3d88b1003bf4a0a148ceb920a6172bdade8e0325a1ed1480ab4fb19"\n' +
       '    $ blockstack-cli gaia_getfile ryan.id https://app.graphitedocs.com documentscollection.json "$APP_KEY" 1 0\n',
-      group: 'Gaia',
+      group: 'Gaia'
     },
     gaia_putfile: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'app_private_key',
           type: 'string',
           realtype: 'private_key',
-          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN,
+          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN
         },
         {
           name: 'data_path',
           type: 'string',
           realtype: 'path',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'gaia_filename',
           type: 'string',
           realtype: 'filename',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'encrypt',
           type: 'string',
           realtype: 'boolean',
-          pattern: BOOLEAN_PATTERN,
+          pattern: BOOLEAN_PATTERN
         },
         {
           name: 'sign',
           type: 'string',
           realtype: 'boolean',
-          pattern: BOOLEAN_PATTERN,
-        },
+          pattern: BOOLEAN_PATTERN
+        }
       ],
       minItems: 4,
       maxItems: 6,
@@ -559,22 +554,22 @@ export const CLI_ARGS = {
       '    {\n' +
       '       "urls": "https://gaia.blockstack.org/hub/19KAzYp4kSKozeAGMUsnuqkEGdgQQLEvwo/file-encrypted-signed.txt"\n' +
       '    }\n',
-      group: 'Gaia',
+      group: 'Gaia'
     },
     gaia_listfiles: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'app_private_key',
           type: 'string',
           realtype: 'private_key',
-          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN,
+          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN
         }
       ],
       minItems: 2,
@@ -592,10 +587,10 @@ export const CLI_ARGS = {
       '    dir/format\n' +
       '    /.dotfile\n' +
       '    3\n',
-      group: 'Gaia',
+      group: 'Gaia'
     },
     gaia_restore_bucket: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'name_or_id_address',
@@ -607,24 +602,24 @@ export const CLI_ARGS = {
           name: 'app_origin',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'backup_phrase',
           type: 'string',
-          realtype: '12_words_or_ciphertext',
+          realtype: '12_words_or_ciphertext'
         },
         {
           name: 'dump_dir',
           type: 'string',
           realtype: 'path',
-          pattern: '.+',
+          pattern: '.+'
         }
       ],
       minItems: 5,
@@ -642,40 +637,40 @@ export const CLI_ARGS = {
       '    Uploaded ./backups/dir\\x2fformat to https://new.gaia.hub/hub/1Lr8ggSgdmfcb4764woYutUfFqQMjEoKHc/dir/format\n' +
       '    Uploaded ./backups/\\x2f.dotfile to https://new.gaia.hub/hub/1Lr8ggSgdmfcb4764woYutUfFqQMjEoKHc//.dotfile\n' +
       '    3\n',
-      group: "Gaia",
+      group: 'Gaia'
     },
     gaia_sethub: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'blockstack_id',
-          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
+          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
         },
         {
           name: 'owner_gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'app_origin',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'app_gaia_hub',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
+          pattern: URL_PATTERN
         },
         {
           name: 'backup_phrase',
           type: 'string',
-          realtype: '12_words_or_ciphertext',
-        },
+          realtype: '12_words_or_ciphertext'
+        }
       ],
       minItems: 5,
       maxItems: 5,
@@ -706,23 +701,23 @@ export const CLI_ARGS = {
       '      "https://my.cool.app": "https://my.app.gaia.hub/hub/1EqzyQLJ15KG1WQmi5cf1HtmSeqS1Wb8tY/"\n' +
       '    }\n' +
       '\n',
-      group: 'Gaia',
+      group: 'Gaia'
     },
     get_account_history: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'address',
-          type: "string",
+          type: 'string',
           realtype: 'address',
-          pattern: STACKS_ADDRESS_PATTERN,
+          pattern: STACKS_ADDRESS_PATTERN
         },
         {
           name: 'page',
-          type: "string",
-          realtype: "integer",
-          pattern: "^[0-9]+$",
-        },
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        }
       ],
       minItems: 2,
       maxItems: 2,
@@ -776,23 +771,23 @@ export const CLI_ARGS = {
       '      }\n'    +
       '    ]\n' +
       '\n',
-      group: 'Account Management',
+      group: 'Account Management'
     },
     get_account_at: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'address',
-          type: "string",
+          type: 'string',
           realtype: 'address',
-          pattern: STACKS_ADDRESS_PATTERN,
+          pattern: STACKS_ADDRESS_PATTERN
         },
         {
           name: 'blocknumber',
-          type: "string",
+          type: 'string',
           realtype: 'integer',
-          pattern: "^[0-9]+$",
-        },
+          pattern: '^[0-9]+$'
+        }
       ],
       minItems: 2,
       maxItems: 2,
@@ -815,7 +810,7 @@ export const CLI_ARGS = {
       '      }\n' +
       '    ]\n' +
       '\n',
-      group: 'Account Management',
+      group: 'Account Management'
     },
     get_address: {
       type: 'array',
@@ -843,17 +838,17 @@ export const CLI_ARGS = {
       '      "BTC": "363pKBhc5ipDws1k5181KFf6RSxhBZ7e3p",\n' +
       '      "STACKS": "SMQWZ30EXVG6XEC1K4QTDP16C1CAWSK1JSWMS0QN"\n' +
       '    }',
-      group: 'Key Management',
+      group: 'Key Management'
     },
     get_blockchain_record: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
-        },
+          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -862,19 +857,19 @@ export const CLI_ARGS = {
       group: 'Querying Blockstack IDs'
     },
     get_blockchain_history: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
+          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
         },
         {
           name: 'page',
           type: 'string',
           realtype: 'page_number',
-          pattern: '^[0-9]+$',
+          pattern: '^[0-9]+$'
         }
       ],
       minItems: 1,
@@ -882,17 +877,17 @@ export const CLI_ARGS = {
       help: 'Get the low-level blockchain-hosted history of operations on a Blocktack ID.  ' +
       'This command is used mainly for debugging and diagnostics, and is not guaranteed to ' +
       'be stable across releases.',
-      group: 'Querying Blockstack IDs',
+      group: 'Querying Blockstack IDs'
     },
     get_confirmations: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'txid',
           type: 'string',
           realtype: 'transaction_id',
-          pattern: TXID_PATTERN,
-        },
+          pattern: TXID_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -906,45 +901,45 @@ export const CLI_ARGS = {
       '      "confirmations": 7,\n' +
       '    }\n' +
       '\n',
-      group: 'Peer Services',
+      group: 'Peer Services'
     },
     get_namespace_blockchain_record: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'namespace_id',
-          type: "string",
+          type: 'string',
           realtype: 'namespace_id',
-          pattern: NAMESPACE_PATTERN,
-        },
+          pattern: NAMESPACE_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
       help: 'Get the low-level blockchain-hosted state for a Blockstack namespace.  This command ' +
       'is used mainly for debugging and diagnostics, and is not guaranteed to be stable across ' +
       'releases.',
-      group: 'Namespace Operations',
+      group: 'Namespace Operations'
     },
     get_app_keys: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'backup_phrase',
           type: 'string',
-          realtype: '12_words_or_ciphertext',
+          realtype: '12_words_or_ciphertext'
         },
         {
           name: 'name_or_id_address',
           type: 'string',
           realtype: 'name-or-id-address',
-          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}|${ID_ADDRESS_PATTERN}`,
+          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}|${ID_ADDRESS_PATTERN}`
         },
         {
           name: 'app_origin',
           type: 'string',
           realtype: 'url',
-          pattern: URL_PATTERN,
-        },
+          pattern: URL_PATTERN
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -974,21 +969,21 @@ export const CLI_ARGS = {
       '      },\n' +
       '      "ownerKeyIndex": 0\n' +
       '    }',
-      group: 'Key Management',
+      group: 'Key Management'
     },
     get_owner_keys: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'backup_phrase',
-          type: "string",
-          realtype: '12_words_or_ciphertext',
+          type: 'string',
+          realtype: '12_words_or_ciphertext'
         },
         {
           name: 'index',
-          type: "string",
+          type: 'string',
           realtype: 'integer',
-          pattern: "^[0-9]+$",
+          pattern: '^[0-9]+$'
         }
       ],
       minItems: 1,
@@ -1024,16 +1019,16 @@ export const CLI_ARGS = {
       '      }\n' +
       '    ]\n' +
       '\n',
-      group: 'Key Management',
+      group: 'Key Management'
     },
     get_payment_key: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'backup_phrase',
-          type: "string",
-          realtype: '12_words_or_ciphertext',
-        },
+          type: 'string',
+          realtype: '12_words_or_ciphertext'
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1055,17 +1050,17 @@ export const CLI_ARGS = {
       '      }\n' +
       '    ]\n' +
       '\n',
-      group: 'Key Management',
+      group: 'Key Management'
     },
     get_zonefile: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'zonefile_hash',
-          type: "string",
+          type: 'string',
           realtype: 'zonefile_hash',
           pattern: ZONEFILE_HASH_PATTERN
-        },
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1078,7 +1073,7 @@ export const CLI_ARGS = {
       '    $TTL 3600\n' +
       '    _http._tcp URI 10 1 "https://gaia.blockstack.org/hub/15BcxePn59Y6mYD2fRLCLCaaHScefqW2No/1/profile.json"\n' +
       '\n',
-      group: 'Peer Services',
+      group: 'Peer Services'
     },
     help: {
       type: 'array',
@@ -1086,23 +1081,23 @@ export const CLI_ARGS = {
         {
           name: 'command',
           type: 'string',
-          realtype: 'command',
-        },
+          realtype: 'command'
+        }
       ],
       minItems: 0,
       maxItems: 1,
       help: 'Get the usage string for a CLI command',
-      group: 'CLI',
+      group: 'CLI'
     },
     lookup: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
-        },
+          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1112,17 +1107,17 @@ export const CLI_ARGS = {
       '\n' +
       '    $ blockstack-cli lookup example.id\n' +
       '\n',
-      group: 'Querying Blockstack IDs',
+      group: 'Querying Blockstack IDs'
     },
     names: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'id_address',
-          type: "string",
+          type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
-        },
+          pattern: ID_ADDRESS_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1132,16 +1127,16 @@ export const CLI_ARGS = {
       '\n' +
       '    $ blockstack-cli names ID-1FpBChfzHG3TdQQRKWAipbLragCUArueG9\n' +
       '\n',
-      group: 'Querying Blockstack IDs',
+      group: 'Querying Blockstack IDs'
     },
     make_keychain: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'backup_phrase',
           type: 'string',
-          realtype: '12_words_or_ciphertext',
-        },
+          realtype: '12_words_or_ciphertext'
+        }
       ],
       minItems: 0,
       maxItems: 1,
@@ -1170,45 +1165,45 @@ export const CLI_ARGS = {
       '      }\n' +
       '    }\n' +
       '\n',
-      group: 'Key Management',
+      group: 'Key Management'
     },
     make_zonefile: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'blockstack_id',
-          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`,
+          pattern: `^${NAME_PATTERN}|${SUBDOMAIN_PATTERN}$`
         },
         {
           name: 'id_address',
           type: 'string',
           realtype: 'ID-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'gaia_url_prefix',
           type: 'string',
           realtype: 'url',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'resolver_url',
           type: 'string',
           realtype: 'url',
-          pattern: '.+',
-        },
+          pattern: '.+'
+        }
       ],
       minItems: 3,
       maxItems: 4,
-      help: "Generate a zone file for a Blockstack ID with the given profile URL.  If you know " +
-      "the ID-address for the Blockstack ID, the profile URL usually takes the form of:\n" + 
-      "\n" +
-      "     {GAIA_URL_PREFIX}/{ADDRESS}/profile.json\n" +
-      "\n" +
-      "where {GAIA_URL_PREFIX} is the *read* endpoint of your Gaia hub (e.g. https://gaia.blockstack.org/hub) and " +
-      "{ADDRESS} is the base58check part of your ID-address (i.e. the string following 'ID-').\n" +
+      help: 'Generate a zone file for a Blockstack ID with the given profile URL.  If you know ' +
+      'the ID-address for the Blockstack ID, the profile URL usually takes the form of:\n' + 
+      '\n' +
+      '     {GAIA_URL_PREFIX}/{ADDRESS}/profile.json\n' +
+      '\n' +
+      'where {GAIA_URL_PREFIX} is the *read* endpoint of your Gaia hub (e.g. https://gaia.blockstack.org/hub) and ' +
+      '{ADDRESS} is the base58check part of your ID-address (i.e. the string following \'ID-\').\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -1217,32 +1212,32 @@ export const CLI_ARGS = {
       '     $TTL 3600\n' +
       '     _http._tcp      IN      URI     10      1       "https://my.gaia.hub/hub/1ArdkA2oLaKnbNbLccBaFhEV4pYju8hJ82/profile.json"\n' +
       '\n',
-      group: "Peer Services",
+      group: 'Peer Services'
     },
     name_import: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'id_address',
-          type: "string",
+          type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'gaia_url_prefix',
-          type: "string",
+          type: 'string',
           realtype: 'url',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'reveal_key',
-          type: "string",
+          type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
         },
@@ -1250,14 +1245,14 @@ export const CLI_ARGS = {
           name: 'zonefile',
           type: 'string',
           realtype: 'path',
-          pattern: '.+',
+          pattern: '.+'
         },
         {
           name: 'zonefile_hash',
           type: 'string',
           realtype: 'zonefile_hash',
-          pattern: ZONEFILE_HASH_PATTERN,
-        },
+          pattern: ZONEFILE_HASH_PATTERN
+        }
       ],
       minItems: 4,
       maxItems: 6,
@@ -1290,7 +1285,7 @@ export const CLI_ARGS = {
       '    $ blockstack-cli name_import example.id "$ID_ADDRESS" https://gaia.blockstack.org/hub "$REVEAL_KEY"\n' + 
       '    f726309cea7a9db364307466dc0e0e759d5c0d6bad1405e2fd970740adc7dc45\n' +
       '\n',
-      group: 'Namespace Operations',
+      group: 'Namespace Operations'
     },
     namespace_preorder: {
       type: 'array',
@@ -1299,27 +1294,27 @@ export const CLI_ARGS = {
           name: 'namespace_id',
           type: 'string',
           realtype: 'namespace_id',
-          pattern: NAMESPACE_PATTERN,
+          pattern: NAMESPACE_PATTERN
         },
         {
           name: 'reveal_address',
           type: 'string',
           realtype: 'address',
-          pattern: ADDRESS_PATTERN,
+          pattern: ADDRESS_PATTERN
         },
         {
           name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
       help: 'Preorder a namespace.  This is the first of three steps to creating a namespace.  ' +
       'Once this transaction is confirmed, you will need to use the `namespace_reveal` command ' +
       'to reveal the namespace (within 24 hours, or 144 blocks).',
-      group: 'Namespace Operations',
+      group: 'Namespace Operations'
     },
     namespace_reveal: {
       type: 'array',
@@ -1328,41 +1323,41 @@ export const CLI_ARGS = {
           name: 'namespace_id',
           type: 'string',
           realtype: 'namespace_id',
-          pattern: NAMESPACE_PATTERN,
+          pattern: NAMESPACE_PATTERN
         },
         {
           name: 'reveal_address',
           type: 'string',
           realtype: 'address',
-          pattern: ADDRESS_PATTERN,
+          pattern: ADDRESS_PATTERN
         },
         {
           // version
           name: 'version',
           type: 'string',
           realtype: '2-byte-integer',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           // lifetime
           name: 'lifetime',
           type: 'string',
           realtype: '4-byte-integer',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           // coeff
           name: 'coefficient',
           type: 'string',
           realtype: '1-byte-integer',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           // base
           name: 'base',
           type: 'string',
           realtype: '1-byte-integer',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           // buckets
@@ -1376,21 +1371,21 @@ export const CLI_ARGS = {
           name: 'nonalpha_discount',
           type: 'string',
           realtype: 'nybble',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           // no-vowel discount
           name: 'no_vowel_discount',
           type: 'string',
           realtype: 'nybble',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 10,
       maxItems: 10,
@@ -1406,14 +1401,14 @@ export const CLI_ARGS = {
           name: 'namespace_id',
           type: 'string',
           realtype: 'namespace_id',
-          pattern: NAMESPACE_PATTERN,
+          pattern: NAMESPACE_PATTERN
         },
         {
           name: 'reveal_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 2,
       maxItems: 2,
@@ -1422,14 +1417,14 @@ export const CLI_ARGS = {
       group: 'Namespace Operations'
     },
     price: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: NAME_PATTERN,
-        },
+          pattern: NAME_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1443,17 +1438,17 @@ export const CLI_ARGS = {
       '      "amount": "5500"\n' +
       '    }\n' +
       '\n',
-      group: 'Querying Blockstack IDs',
+      group: 'Querying Blockstack IDs'
     },
     price_namespace: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'namespace_id',
-          type: "string",
+          type: 'string',
           realtype: 'namespace_id',
-          pattern: NAMESPACE_PATTERN,
-        },
+          pattern: NAMESPACE_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -1468,19 +1463,19 @@ export const CLI_ARGS = {
       '      "amount": "40000000"\n' +
       '    }\n' +
       '\n',
-      group: 'Namespace Operations',
+      group: 'Namespace Operations'
     },
     profile_sign: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'profile',
-          type: "string",
-          realtype: 'path',
+          type: 'string',
+          realtype: 'path'
         },
         {
           name: 'owner_key',
-          type: "string",
+          type: 'string',
           realtype: 'private_key',
           pattern: PRIVATE_KEY_PATTERN
         }
@@ -1494,32 +1489,32 @@ export const CLI_ARGS = {
       '    $ # Tip: you can get the owner key from your 12-word backup phrase using the get_owner_keys command\n' +
       '    $ blockstack-cli profile_sign /path/to/profile.json 0ffd299af9c257173be8486ef54a4dd1373407d0629ca25ca68ff24a76be09fb01\n' +
       '\n',
-      group: 'Profiles',
+      group: 'Profiles'
     },
     profile_store: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'user_id',
-          type: "string",
+          type: 'string',
           realtype: 'name-or-id-address',
-          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}|${ID_ADDRESS_PATTERN}`,
+          pattern: `${NAME_PATTERN}|${SUBDOMAIN_PATTERN}|${ID_ADDRESS_PATTERN}`
         },
         {
           name: 'profile',
-          type: "string",
-          realtype: 'path',
+          type: 'string',
+          realtype: 'path'
         },
         {
           name: 'owner_key',
-          type: "string",
+          type: 'string',
           realtype: 'private_key',
           pattern: PRIVATE_KEY_PATTERN
         },
         {
           name: 'gaia_hub',
-          type: "string",
-          realtype: 'url',
+          type: 'string',
+          realtype: 'url'
         }
       ],
       minItems: 4,
@@ -1531,18 +1526,18 @@ export const CLI_ARGS = {
       group: 'Profiles'
     },
     profile_verify: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'profile',
-          type: "string",
-          realtype: 'path',
+          type: 'string',
+          realtype: 'path'
         },
         {
           name: 'id_address',
           type: 'string',
           realtype: 'id-address',
-          pattern: `${ID_ADDRESS_PATTERN}|${PUBLIC_KEY_PATTERN}`,
+          pattern: `${ID_ADDRESS_PATTERN}|${PUBLIC_KEY_PATTERN}`
         }
       ],
       minItems: 2,
@@ -1556,16 +1551,16 @@ export const CLI_ARGS = {
       '    $ # Tip: you can get the ID-address for a name with the "whois" command\n' +
       '    $ blockstack-cli profile_verify /tmp/judecn.id.jwt ID-16EMaNw3pkn3v6f2BgnSSs53zAKH4Q8YJg\n' +
       '\n',
-      group: 'Profiles',
+      group: 'Profiles'
     },
     renew: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'owner_key',
@@ -1583,19 +1578,19 @@ export const CLI_ARGS = {
           name: 'new_id_address',
           type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
+          realtype: 'path'
         },
         {
           name: 'zonefile_hash',
           type: 'string',
           realtype: 'zonefile_hash',
-          pattern: ZONEFILE_HASH_PATTERN,
-        },
+          pattern: ZONEFILE_HASH_PATTERN
+        }
       ],
       minItems: 3,
       maxItems: 6,
@@ -1639,22 +1634,22 @@ export const CLI_ARGS = {
       '      "https://core.blockstack.org"\n' +
       '    ]\n' +
       '\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     register: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'owner_key',
           type: 'string',
           realtype: 'private_key',
-          pattern: PRIVATE_KEY_PATTERN,
+          pattern: PRIVATE_KEY_PATTERN
         },
         {
           name: 'payment_key',
@@ -1665,13 +1660,13 @@ export const CLI_ARGS = {
         {
           name: 'gaia_hub',
           type: 'string',
-          realtype: 'url',
+          realtype: 'url'
         },
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
-        },
+          realtype: 'path'
+        }
       ],
       minItems: 4,
       maxItems: 5,
@@ -1706,22 +1701,22 @@ export const CLI_ARGS = {
       '    $ blockstack-cli register example.id "$OWNER" "$PAYMENT" https://hub.blockstack.org\n' +
       '    9bb908bfd4ab221f0829167a461229172184fc825a012c4e551533aa283207b1\n' +
       '\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     register_addr: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'id-address',
           type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'payment_key',
@@ -1732,12 +1727,12 @@ export const CLI_ARGS = {
         {
           name: 'gaia_url_prefix',
           type: 'string',
-          realtype: 'url',
+          realtype: 'url'
         },
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
+          realtype: 'path'
         }
       ],
       minItems: 4,
@@ -1775,38 +1770,38 @@ export const CLI_ARGS = {
       '    $ export ID_ADDRESS="ID-18e1bqU7B5qUPY3zJgMLxDnexyStTeSnvV"\n' +
       '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
       '    $ blockstack-cli register_addr example.id "$ID_ADDRESS" "$PAYMENT" https://gaia.blockstack.org/hub',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     register_subdomain: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'blockstack_id',
-          pattern: SUBDOMAIN_PATTERN,
+          pattern: SUBDOMAIN_PATTERN
         },
         {
           name: 'owner_key',
           type: 'string',
           realtype: 'private_key',
-          pattern: PRIVATE_KEY_PATTERN,
+          pattern: PRIVATE_KEY_PATTERN
         },
         {
           name: 'gaia_hub',
           type: 'string',
-          realtype: 'url',
+          realtype: 'url'
         },
         {
           name: 'registrar',
           type: 'string',
-          realtype: 'url',
+          realtype: 'url'
         },
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
-        },
+          realtype: 'path'
+        }
       ],
       minItems: 4,
       maxItems: 5,
@@ -1826,16 +1821,16 @@ export const CLI_ARGS = {
       '    $ export OWNER="6e50431b955fe73f079469b24f06480aee44e4519282686433195b3c4b5336ef01"\n' +
       '    $ # NOTE: https://registrar.blockstack.org is the registrar for personal.id!\n' + 
       '    $ blockstack-cli register_subdomain hello.personal.id "$OWNER" https://hub.blockstack.org https://registrar.blockstack.org\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     revoke: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'owner_key',
@@ -1848,7 +1843,7 @@ export const CLI_ARGS = {
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -1865,29 +1860,29 @@ export const CLI_ARGS = {
       '    $ blockstack-cli revoke example.id "$OWNER" "$PAYMENT"\n' +
       '    233b559c97891affa010567bd582110508d0236b4e3f88d3b1d0731629e030b0\n' +
       '\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     send_btc: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'recipient_address',
           type: 'string',
           realtype: 'address',
-          pattern: ADDRESS_PATTERN,
+          pattern: ADDRESS_PATTERN
         },
         {
           name: 'amount',
           type: 'string',
           realtype: 'satoshis',
-          pattern: INT_PATTERN,
+          pattern: INT_PATTERN
         },
         {
           name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -1911,13 +1906,13 @@ export const CLI_ARGS = {
       group: 'Account Management'
     },
     send_tokens: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'address',
           type: 'string',
           realtype: 'address',
-          pattern: STACKS_ADDRESS_PATTERN,
+          pattern: STACKS_ADDRESS_PATTERN
         },
         {
           name: 'type',
@@ -1929,7 +1924,7 @@ export const CLI_ARGS = {
           name: 'amount',
           type: 'string',
           realtype: 'integer',
-          pattern: '^[0-9]+$',
+          pattern: '^[0-9]+$'
         },
         {
           name: 'payment_key',
@@ -1947,8 +1942,8 @@ export const CLI_ARGS = {
           name: 'memo',
           type: 'string',
           realtype: 'string',
-          pattern: '^.{0,34}$',
-        },
+          pattern: '^.{0,34}$'
+        }
       ],
       minItems: 5,
       maxItems: 6,
@@ -2004,28 +1999,28 @@ export const CLI_ARGS = {
       '      "STACKS": "12345"\n' +
       '    }\n' +
       '\n',
-      group: 'Account Management',
+      group: 'Account Management'
     },
     transfer: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'new_id_address',
           type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'keep_zonefile',
           type: 'string',
           realtype: 'true-or-false',
-          pattern: '^true$|^false$',
+          pattern: '^true$|^false$'
         },
         {
           name: 'owner_key',
@@ -2038,7 +2033,7 @@ export const CLI_ARGS = {
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 5,
       maxItems: 5,
@@ -2062,29 +2057,29 @@ export const CLI_ARGS = {
       '    $ blockstack-cli transfer example.id ID-1HJA1AJvWef21XbQVL2AcTv71b6JHGPfDX true "$OWNER" "$PAYMENT"\n' +
       '    e09dc158e586d0c09dbcdcba917ec394e6c6ac2b9c91c4b55f32f5973e4f08fc\n' +
       '\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     tx_preorder: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'id_address',
           type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -2095,22 +2090,22 @@ export const CLI_ARGS = {
       '\n' +
       'This is a low-level command that only experienced Blockstack developers should use.  ' +
       'If you just want to register a name, use the "register" command.\n',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     tx_register: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'id_address',
           type: 'string',
           realtype: 'id-address',
-          pattern: ID_ADDRESS_PATTERN,
+          pattern: ID_ADDRESS_PATTERN
         },
         {
           name: 'payment_key',
@@ -2121,14 +2116,14 @@ export const CLI_ARGS = {
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
+          realtype: 'path'
         },
         {
           name: 'zonefile_hash',
           type: 'string',
           realtype: 'zoenfile_hash',
-          pattern: ZONEFILE_HASH_PATTERN,
-        },
+          pattern: ZONEFILE_HASH_PATTERN
+        }
       ],
       minItems: 3,
       maxItems: 5,
@@ -2139,21 +2134,21 @@ export const CLI_ARGS = {
       '\n' +
       'This is a low-level command that only experienced Blockstack developers should use.  If you ' +
       'just want to register a name, you should use the "register" command.',
-      group: 'Blockstack ID Management',
+      group: 'Blockstack ID Management'
     },
     update: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
           type: 'string',
           realtype: 'on-chain-blockstack_id',
-          pattern: NAME_PATTERN,
+          pattern: NAME_PATTERN
         },
         {
           name: 'zonefile',
           type: 'string',
-          realtype: 'path',
+          realtype: 'path'
         },
         {
           name: 'owner_key',
@@ -2171,8 +2166,8 @@ export const CLI_ARGS = {
           name: 'zonefile_hash',
           type: 'string',
           realtype: 'zonefile_hash',
-          pattern: ZONEFILE_HASH_PATTERN,
-        },
+          pattern: ZONEFILE_HASH_PATTERN
+        }
       ],
       minItems: 4,
       maxItems: 5,
@@ -2218,14 +2213,14 @@ export const CLI_ARGS = {
       group: 'Blockstack ID Management'
     },
     whois: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'blockstack_id',
-          type: "string",
+          type: 'string',
           realtype: 'blockstack_id',
-          pattern: NAME_PATTERN + "|"+ SUBDOMAIN_PATTERN,
-        },
+          pattern: NAME_PATTERN + '|'+ SUBDOMAIN_PATTERN
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -2250,16 +2245,16 @@ export const CLI_ARGS = {
       '      "zonefile_hash": "ae4ee8e7f30aa890468164e667e2c203266f726e"\n' +
       '    }\n' +
       '\n',
-      group: 'Querying Blockstack IDs',
+      group: 'Querying Blockstack IDs'
     },
     zonefile_push: {
-      type: "array",
+      type: 'array',
       items: [
         {
           name: 'zonefile',
-          type: "string",
-          realtype: 'path',
-        },
+          type: 'string',
+          realtype: 'path'
+        }
       ],
       minItems: 1,
       maxItems: 1,
@@ -2274,8 +2269,8 @@ export const CLI_ARGS = {
       '      "https://core.blockstack.org"\n' +
       '    ]\n' +
       '\n',
-      group: 'Peer Services',
-    },
+      group: 'Peer Services'
+    }
   } as CLI_PROP,
   additionalProperties: false,
   strict: true
@@ -2339,8 +2334,8 @@ Options can be:
  */
 function formatHelpString(indent: number, limit: number, helpString: string) : string {
   const lines = helpString.split('\n');
-  let buf = "";
-  let pad = "";
+  let buf = '';
+  let pad = '';
   for (let i = 0; i < indent; i++) {
     pad += ' ';
   }
@@ -2389,8 +2384,8 @@ function formatHelpString(indent: number, limit: number, helpString: string) : s
  *            [--arg_name TYPE]
  */
 interface CLI_COMMAND_HELP {
-   raw: string;
-   kw: string
+  raw: string;
+  kw: string
 }
 
 function formatCommandHelpLines(commandName: string, commandArgs: Array<CLI_PROP_ITEM>) : CLI_COMMAND_HELP {
@@ -2404,7 +2399,7 @@ function formatCommandHelpLines(commandName: string, commandArgs: Array<CLI_PROP
     if (!commandArgs[i].name) {
       console.log(commandName);
       console.log(commandArgs[i]);
-      throw new Error(`BUG: command info is missing a "name" field`);
+      throw new Error('BUG: command info is missing a "name" field');
     }
     if (i + 1 <= commandInfo.minItems) {
       rawUsage += `${commandArgs[i].name.toUpperCase()} `;
@@ -2421,9 +2416,9 @@ function formatCommandHelpLines(commandName: string, commandArgs: Array<CLI_PROP
   
   for (let i = 0; i < commandArgs.length; i++) {
     if (!commandArgs[i].realtype) {
-      console.log(commandName)
-      console.log(commandArgs[i])
-      throw new Error(`BUG: command info is missing a "realtype" field`);
+      console.log(commandName);
+      console.log(commandArgs[i]);
+      throw new Error('BUG: command info is missing a "realtype" field');
     }
     if (i + 1 <= commandInfo.minItems) {
       kwUsage += `--${commandArgs[i].name} ${commandArgs[i].realtype.toUpperCase()}`;
@@ -2442,37 +2437,36 @@ function formatCommandHelpLines(commandName: string, commandArgs: Array<CLI_PROP
  * Get the set of commands grouped by command group
  */
 interface CLI_COMMAND_GROUP_ITEM {
-   command: string;
-   help: string
+  command: string;
+  help: string
 }
 
 interface CLI_COMMAND_GROUP {
-   [index: string] : CLI_COMMAND_GROUP_ITEM[]
+  [index: string] : CLI_COMMAND_GROUP_ITEM[]
 };
 
 function getCommandGroups() : CLI_COMMAND_GROUP {
-  let groups : CLI_COMMAND_GROUP = {};
+  const groups : CLI_COMMAND_GROUP = {};
   const commands = Object.keys(CLI_ARGS.properties);
   for (let i = 0; i < commands.length; i++) {
     const command = commands[i];
     const group = CLI_ARGS.properties[command].group;
-    const help = CLI_ARGS.properties[command].help;
     
     if (!groups.hasOwnProperty(group)) {
-        groups[group] = [
-           {
-              'command': command,
-              'help': CLI_ARGS.properties[command].help
-           } as CLI_COMMAND_GROUP_ITEM 
-        ];
+      groups[group] = [
+        {
+          'command': command,
+          'help': CLI_ARGS.properties[command].help
+        } as CLI_COMMAND_GROUP_ITEM 
+      ];
     }
     else {
-       groups[group].push(
-          {
-             'command': command,
-             'help': CLI_ARGS.properties[command].help
-          } as CLI_COMMAND_GROUP_ITEM
-       );
+      groups[group].push(
+        {
+          'command': command,
+          'help': CLI_ARGS.properties[command].help
+        } as CLI_COMMAND_GROUP_ITEM
+      );
     }
   }
   return groups;
@@ -2488,7 +2482,7 @@ export function makeAllCommandsList() : string {
   let res = `All commands (run '${process.argv[1]} help COMMAND' for details):\n`;
   for (let i = 0; i < groupNames.length; i++) {
     res += `  ${groupNames[i]}: `;
-    let cmds = [];
+    const cmds = [];
     for (let j = 0; j < groups[groupNames[i]].length; j++) {
       cmds.push(groups[groupNames[i]][j].command);
     }
@@ -2511,7 +2505,7 @@ export function makeAllCommandsHelp(): string {
   const groups = getCommandGroups();
   const groupNames = Object.keys(groups).sort();
   
-  let helps = [];
+  const helps = [];
   let cmds = [];
   for (let i = 0; i < groupNames.length; i++) {
     for (let j = 0; j < groups[groupNames[i]].length; j++) {
@@ -2531,7 +2525,7 @@ export function makeAllCommandsHelp(): string {
  * Make a usage string for a single command
  */
 export function makeCommandUsageString(command?: string) : string {
-  let res = "";
+  let res = '';
   if (command === 'all') {
     return makeAllCommandsHelp();
   }
@@ -2544,8 +2538,6 @@ export function makeCommandUsageString(command?: string) : string {
     return makeAllCommandsList();
   }
 
-  const groups = getCommandGroups();
-  const groupNames = Object.keys(groups).sort();
   const help = commandInfo.help;
   
   const cmdFormat = formatCommandHelpLines(command, commandInfo.items);
@@ -2553,7 +2545,7 @@ export function makeCommandUsageString(command?: string) : string {
 
   // make help string for one command 
   res += `Command: ${command}\n`;
-  res += `Usage:\n`;
+  res += 'Usage:\n';
   res += `${cmdFormat.raw}\n`;
   res += `${cmdFormat.kw}\n`;
   res += formattedHelp;
@@ -2563,7 +2555,7 @@ export function makeCommandUsageString(command?: string) : string {
 /*
  * Make the usage documentation
  */
-export function makeUsageString(usageString: string) : string {
+export function makeUsageString() : string {
   let res = `${USAGE}\n\nCommand reference\n`;
   const groups = getCommandGroups();
   const groupNames = Object.keys(groups).sort();
@@ -2599,7 +2591,7 @@ export function makeUsageString(usageString: string) : string {
  * Print usage
  */
 export function printUsage() {
-  console.error(makeUsageString(USAGE));
+  console.error(makeUsageString());
 }
 
 /*
@@ -2610,14 +2602,14 @@ export function printUsage() {
  * The key _ is mapped to the non-opts list.
  */
 interface CLI_OPTS {
-   [index: string]: null | boolean | string | string[]
+  [index: string]: null | boolean | string | string[]
 };
 
 export function getCLIOpts(argv: string[],
-                           opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : CLI_OPTS {
-  let optsTable : CLI_OPTS = {};
-  let remainingArgv = [];
-  let argvBuff = argv.slice(0);
+  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : CLI_OPTS {
+  const optsTable : CLI_OPTS = {};
+  const remainingArgv = [];
+  const argvBuff = argv.slice(0);
 
   for (let i = 0; i < opts.length; i++) {
     if (opts[i] == ':') {
@@ -2631,7 +2623,7 @@ export function getCLIOpts(argv: string[],
     }
   }
 
-  for (let opt of Object.keys(optsTable)) {
+  for (const opt of Object.keys(optsTable)) {
     for (let i = 0; i < argvBuff.length; i++) {
       if (argvBuff[i] === null) {
         break;
@@ -2662,7 +2654,7 @@ export function getCLIOpts(argv: string[],
       if (argvBuff[i] === '--') {
         continue;
       }
-      remainingArgv.push(argvBuff[i])
+      remainingArgv.push(argvBuff[i]);
     }
   }
 
@@ -2671,48 +2663,48 @@ export function getCLIOpts(argv: string[],
 }
 
 export function CLIOptAsString(opts: CLI_OPTS, key: string) : string | null {
-   if (opts[key] === null || opts[key] === undefined) {
-      return null;
-   }
-   else if (typeof opts[key] === 'string') {
-      return `${opts[key]}`;
-   }
-   else {
-      throw new Error(`Option '${key}' is not a string`);
-   }
+  if (opts[key] === null || opts[key] === undefined) {
+    return null;
+  }
+  else if (typeof opts[key] === 'string') {
+    return `${opts[key]}`;
+  }
+  else {
+    throw new Error(`Option '${key}' is not a string`);
+  }
 }
 
 export function CLIOptAsBool(opts: CLI_OPTS, key: string) : boolean {
-   if (typeof opts[key] === 'boolean' || opts[key] === null) {
-      return !!opts[key];
-   }
-   else {
-      throw new Error(`Option '${key}' is not a boolean`);
-   }
+  if (typeof opts[key] === 'boolean' || opts[key] === null) {
+    return !!opts[key];
+  }
+  else {
+    throw new Error(`Option '${key}' is not a boolean`);
+  }
 }
 
 function isStringArray(value: any): value is string[] {
-   if (value instanceof Array) {
-      return value
-         .map((s: any) => typeof s === 'string')
-         .reduce((x: boolean, y: boolean) => x && y, true);
-   }
-   else {
-      return false;
-   }
+  if (value instanceof Array) {
+    return value
+      .map((s: any) => typeof s === 'string')
+      .reduce((x: boolean, y: boolean) => x && y, true);
+  }
+  else {
+    return false;
+  }
 }
 
 export function CLIOptAsStringArray(opts: CLI_OPTS, key: string) : string[] | null {
-   let value : any = opts[key];
-   if (value === null || value === undefined) {
-      return null;
-   }
-   else if (isStringArray(value)) {
-      return value;
-   }
-   else {
-      throw new Error(`Option '${key}' is not a string array`);
-   }
+  const value : any = opts[key];
+  if (value === null || value === undefined) {
+    return null;
+  }
+  else if (isStringArray(value)) {
+    return value;
+  }
+  else {
+    throw new Error(`Option '${key}' is not a string array`);
+  }
 }
 
 
@@ -2726,8 +2718,8 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
     commandProps = [commandProps];
   }
 
-  let orderedArgs = [];
-  let foundArgs : Record<string, string> = {};
+  const orderedArgs = [];
+  const foundArgs : Record<string, string> = {};
 
   // scan for keywords 
   for (let i = 0; i < argsList.length; i++) {
@@ -2740,7 +2732,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
       if (foundArgs.hasOwnProperty(argName)) {
         return {
           'status': false,
-          'error': `duplicate argument ${argsList[i]}`,
+          'error': `duplicate argument ${argsList[i]}`
         };
       }
 
@@ -2770,7 +2762,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
       else {
         return {
           'status': false,
-          'error': `no such argument ${argsList[i]}`,
+          'error': `no such argument ${argsList[i]}`
         };
       }
     }
@@ -2782,7 +2774,7 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
 
   // merge foundArgs and orderedArgs back into an ordered argument list
   // that is conformant to the CLI specification.
-  let mergedArgs = [];
+  const mergedArgs = [];
   let orderedArgIndex = 0;
 
   for (let i = 0; i < commandProps.length; i++) {
@@ -2833,24 +2825,24 @@ export interface CheckArgsFailType {
 export function checkArgs(argList: Array<string>) 
   : CheckArgsSuccessType | CheckArgsFailType {
   if (argList.length <= 2) {
-     return {
-       'success': false,
-       'error': 'No command given',
-       'usage': true,
-       'command': '',
-     }
+    return {
+      'success': false,
+      'error': 'No command given',
+      'usage': true,
+      'command': ''
+    };
   }
 
   const commandName = argList[2];
   const allCommandArgs = argList.slice(3);
 
   if (!CLI_ARGS.properties.hasOwnProperty(commandName)) {
-     return {
-       'success': false,
-       'error': `Unrecognized command '${commandName}'`,
-       'usage': true,
-       'command': commandName,
-     };
+    return {
+      'success': false,
+      'error': `Unrecognized command '${commandName}'`,
+      'usage': true,
+      'command': commandName
+    };
   }
 
   const parsedCommandArgs = getCommandArgs(commandName, allCommandArgs);
@@ -2859,7 +2851,7 @@ export function checkArgs(argList: Array<string>)
       'success': false,
       'error': parsedCommandArgs.error,
       'usage': true,
-      'command': commandName,
+      'command': commandName
     };
   }
 
@@ -2875,7 +2867,7 @@ export function checkArgs(argList: Array<string>)
         // optional argument not given.  Update the schema we're checking against
         // to expect this.
         commandArgs[i] = null;
-        commandSchema.items[i] = { type: "null" };
+        commandSchema.items[i] = { type: 'null' };
       }
     }
   }
@@ -2883,13 +2875,13 @@ export function checkArgs(argList: Array<string>)
   const ajv = Ajv();
   const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
-     // console.error(ajv.errors);
-     return {
-       'success': false,
-       'error': 'Invalid command arguments',
-       'usage': true,
-       'command': commandName,
-     };
+    // console.error(ajv.errors);
+    return {
+      'success': false,
+      'error': 'Invalid command arguments',
+      'usage': true,
+      'command': commandName
+    };
   }
 
   return {
@@ -2908,10 +2900,9 @@ export function checkArgs(argList: Array<string>)
  */
 export function loadConfig(configFile: string, networkType: string) : CLI_CONFIG_TYPE {
   if (networkType !== 'mainnet' && networkType !== 'testnet' && networkType != 'regtest') {
-    throw new Error("Unregognized network")
+    throw new Error('Unregognized network');
   }
 
-  let configData = null;
   let configRet : CLI_CONFIG_TYPE;
 
   if (networkType === 'mainnet') {

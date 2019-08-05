@@ -1,13 +1,9 @@
-import blockstack from 'blockstack';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as blockstack from 'blockstack';
 import * as URL from 'url';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
+import * as jsontokens from 'jsontokens';
 
-declare var jsontokens : any;
-var jsontokens = require('jsontokens');
-
-declare var ZoneFile : any;
-var ZoneFile = require('zone-file');
+const ZoneFile = require('zone-file');
 
 import {
   canonicalPrivateKey,
@@ -18,16 +14,16 @@ import {
 } from './utils';
 
 import {
-   CLINetworkAdapter,
-   NameInfoType
+  CLINetworkAdapter,
+  NameInfoType
 } from './network';
 
 import {
-   UserData
+  UserData
 } from 'blockstack/lib/auth/authApp';
 
 import {
-   GaiaHubConfig
+  GaiaHubConfig
 } from 'blockstack/lib/storage/hub';
 
 
@@ -37,13 +33,14 @@ import {
  * and store the relevant data to our emulated localStorage.
  */
 function makeFakeAuthResponseToken(appPrivateKey: string | null,
-                                   hubURL: string | null,
-                                   associationToken?: string) {  
+  hubURL: string | null,
+  associationToken?: string) {  
   const ownerPrivateKey = '24004db06ef6d26cdd2b0fa30b332a1b10fa0ba2b07e63505ffc2a9ed7df22b4';
   const transitPrivateKey = 'f33fb466154023aba2003c17158985aa6603db68db0f1afc0fcf1d641ea6c2cb';
   const transitPublicKey = '0496345da77fb5e06757b9c4fd656bf830a3b293f245a6cc2f11f8334ebb690f1' + 
     '9582124f4b07172eb61187afba4514828f866a8a223e0d5c539b2e38a59ab8bb3';
 
+  // eslint-disable-next-line
   window.localStorage.setItem('blockstack-transit-private-key', transitPrivateKey)
 
   const authResponse = blockstack.makeAuthResponse(
@@ -68,19 +65,19 @@ function makeFakeAuthResponseToken(appPrivateKey: string | null,
  * TODO belongs in a "gaia.js" library
  */
 export function makeAssociationToken(appPrivateKey: string, identityKey: string) : string {
-  const appPublicKey = getPublicKeyFromPrivateKey(`${canonicalPrivateKey(appPrivateKey)}01`)
-  const FOUR_MONTH_SECONDS = 60 * 60 * 24 * 31 * 4
-  const salt = crypto.randomBytes(16).toString('hex')
-  const identityPublicKey = getPublicKeyFromPrivateKey(identityKey)
+  const appPublicKey = getPublicKeyFromPrivateKey(`${canonicalPrivateKey(appPrivateKey)}01`);
+  const FOUR_MONTH_SECONDS = 60 * 60 * 24 * 31 * 4;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const identityPublicKey = getPublicKeyFromPrivateKey(identityKey);
   const associationTokenClaim = {
     childToAssociate: appPublicKey,
     iss: identityPublicKey,
     exp: FOUR_MONTH_SECONDS + ((new Date().getTime())/1000),
     salt 
-  }
+  };
   const associationToken = new jsontokens.TokenSigner('ES256K', identityKey)
-    .sign(associationTokenClaim)
-  return associationToken
+    .sign(associationTokenClaim);
+  return associationToken;
 }
 
 /*
@@ -89,9 +86,9 @@ export function makeAssociationToken(appPrivateKey: string, identityKey: string)
  * Returns a Promise that resolves to the (fake) userData
  */
 export function gaiaAuth(network: CLINetworkAdapter,
-                         appPrivateKey: string | null,
-                         hubUrl: string | null,
-                         ownerPrivateKey?: string) : Promise<UserData> {
+  appPrivateKey: string | null,
+  hubUrl: string | null,
+  ownerPrivateKey?: string) : Promise<UserData> {
   // Gaia speaks mainnet only!
   if (!network.isMainnet()) {
     throw new Error('Gaia only works with mainnet networks.');
@@ -116,18 +113,18 @@ export function gaiaAuth(network: CLINetworkAdapter,
  * Returns a Promise that resolves to a GaiaHubConfig
  */
 export function gaiaConnect(network: CLINetworkAdapter,
-                            gaiaHubUrl: string, 
-                            privateKey: string,
-                            ownerPrivateKey?: string
+  gaiaHubUrl: string, 
+  privateKey: string,
+  ownerPrivateKey?: string
 ) {
   const addressMainnet = network.coerceMainnetAddress(
-    getPrivateKeyAddress(network, `${canonicalPrivateKey(privateKey)}01`))
+    getPrivateKeyAddress(network, `${canonicalPrivateKey(privateKey)}01`));
   const addressMainnetCanonical = network.coerceMainnetAddress(
-    getPrivateKeyAddress(network, canonicalPrivateKey(privateKey)))
+    getPrivateKeyAddress(network, canonicalPrivateKey(privateKey)));
 
-  let associationToken
+  let associationToken;
   if (ownerPrivateKey) {
-    associationToken = makeAssociationToken(privateKey, ownerPrivateKey)
+    associationToken = makeAssociationToken(privateKey, ownerPrivateKey);
   }
 
   return blockstack.connectToGaiaHub(gaiaHubUrl, canonicalPrivateKey(privateKey), associationToken)
@@ -157,11 +154,11 @@ export function gaiaConnect(network: CLINetworkAdapter,
  * Throws an exception if the profile URL could not be determined
  */
 function gaiaFindProfileName(network: CLINetworkAdapter,
-                             hubConfig: GaiaHubConfig,
-                             blockstackID?: string
+  hubConfig: GaiaHubConfig,
+  blockstackID?: string
 ): Promise<string> {
   if (!blockstackID || blockstackID === null || blockstackID === undefined) {
-    return Promise.resolve().then(() => 'profile.json')
+    return Promise.resolve().then(() => 'profile.json');
   }
   else {
     return network.getNameInfo(blockstackID)
@@ -194,7 +191,7 @@ function gaiaFindProfileName(network: CLINetworkAdapter,
 
         const profilePath = profileUrlPath.substring(gaiaReadUrlPath.length + 1);
         return profilePath;
-      })
+      });
   }
 }
 
@@ -216,10 +213,10 @@ function gaiaFindProfileName(network: CLINetworkAdapter,
  * @blockstackID (string) optional; the blockstack ID for which this profile will be stored.
  */
 export function gaiaUploadProfile(network: CLINetworkAdapter,
-                                  gaiaHubURL: string, 
-                                  gaiaData: string,
-                                  privateKey: string,
-                                  blockstackID?: string
+  gaiaHubURL: string, 
+  gaiaData: string,
+  privateKey: string,
+  blockstackID?: string
 ) {
   let hubConfig : GaiaHubConfig;
   return gaiaConnect(network, gaiaHubURL, privateKey)
@@ -245,10 +242,10 @@ export function gaiaUploadProfile(network: CLINetworkAdapter,
  * @return a promise with {'dataUrls': [urls to the data]}, or {'error': ...}
  */
 export function gaiaUploadProfileAll(network: CLINetworkAdapter,
-                                     gaiaUrls: string[],
-                                     gaiaData: string,
-                                     privateKey: string,
-                                     blockstackID?: string
+  gaiaUrls: string[],
+  gaiaData: string,
+  privateKey: string,
+  blockstackID?: string
 ) : Promise<{dataUrls?: string[], error?: string}> {
   const sanitizedGaiaUrls = gaiaUrls.map((gaiaUrl) => {
     const urlInfo = URL.parse(gaiaUrl);
@@ -261,7 +258,7 @@ export function gaiaUploadProfileAll(network: CLINetworkAdapter,
     // keep flow happy
     return `${String(urlInfo.protocol)}//${String(urlInfo.host)}`;
   })
-  .filter((gaiaUrl) => gaiaUrl.length > 0);
+    .filter((gaiaUrl) => gaiaUrl.length > 0);
 
   const uploadPromises = sanitizedGaiaUrls.map((gaiaUrl) => 
     gaiaUploadProfile(network, gaiaUrl, gaiaData, privateKey, blockstackID));
@@ -290,14 +287,14 @@ export function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string
   gaiaHubUrl: string, ownerKey: string) {
 
   const address = getPrivateKeyAddress(network, ownerKey);
-  const mainnetAddress = network.coerceMainnetAddress(address)
+  const mainnetAddress = network.coerceMainnetAddress(address);
 
   return gaiaConnect(network, gaiaHubUrl, ownerKey)
     .then((hubConfig) => {
       if (!hubConfig.url_prefix) {
         throw new Error('Invalid hub config: no read_url_prefix defined');
       }
-      const gaiaReadUrl = hubConfig.url_prefix.replace(/\/+$/, "");
+      const gaiaReadUrl = hubConfig.url_prefix.replace(/\/+$/, '');
       const profileUrl = `${gaiaReadUrl}/${mainnetAddress}/profile.json`;
       try {
         checkUrl(profileUrl);
@@ -309,7 +306,7 @@ export function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string
           'hints': [
             'Make sure the Gaia hub read URL scheme is present and well-formed.',
             `Check the "read_url_prefix" field of ${gaiaHubUrl}/hub_info`
-          ],
+          ]
         });
       }
       return blockstack.makeProfileZoneFile(name, profileUrl);
@@ -320,11 +317,11 @@ export function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string
  * Given a Gaia bucket URL, extract its address
  */
 export function getGaiaAddressFromURL(appUrl: string): string {
-    const matches = appUrl.match(/([13][a-km-zA-HJ-NP-Z0-9]{26,35})/)
-    if (!matches) {
-      throw new Error('Failed to parse gaia address')
-    }
-    return matches[matches.length - 1]
+  const matches = appUrl.match(/([13][a-km-zA-HJ-NP-Z0-9]{26,35})/);
+  if (!matches) {
+    throw new Error('Failed to parse gaia address');
+  }
+  return matches[matches.length - 1];
 }
 
 

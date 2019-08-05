@@ -1,16 +1,11 @@
 // TODO: most of this code should be in blockstack.js
 // Will remove most of this code once the wallet functionality is there instead.
 
-import blockstack from 'blockstack';
+import * as blockstack from 'blockstack';
 import * as bitcoin from 'bitcoinjs-lib';
-import bip39 from 'bip39';
-import crypto from 'crypto';
+import * as bip39 from 'bip39';
 
-declare var c32check : any;
-var c32check = require('c32check');
-
-declare var keychains : any;
-var keychains = require("blockstack-keychains");
+const c32check = require('c32check');
 
 import {
   getPrivateKeyAddress
@@ -21,49 +16,49 @@ import {
 } from './cli';
 
 import {
-   CLINetworkAdapter
+  CLINetworkAdapter
 } from './network';
 
 import * as bip32 from 'bip32';
-import { BIP32 } from 'bip32';
+import { BIP32Interface } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
 
 export interface OwnerKeyInfoType {
-   privateKey: string;
-   version: string;
-   index: number;
-   idAddress: string;
+  privateKey: string;
+  version: string;
+  index: number;
+  idAddress: string;
 };
 
 export interface PaymentKeyInfoType {
-   privateKey: string;
-   address: {
-      BTC: string;
-      STACKS: string;
-   };
-   index: number
+  privateKey: string;
+  address: {
+    BTC: string;
+    STACKS: string;
+  };
+  index: number
 };
 
 export interface AppKeyInfoType {
-   keyInfo: {
-      privateKey: string;
-      address: string;
-   };
-   legacyKeyInfo: {
-      privateKey: string;
-      address: string;
-   };
-   ownerKeyIndex: number
+  keyInfo: {
+    privateKey: string;
+    address: string;
+  };
+  legacyKeyInfo: {
+    privateKey: string;
+    address: string;
+  };
+  ownerKeyIndex: number
 };
 
-function walletFromMnemonic(mnemonic: string): blockstack.BlockstackWallet {
-  const seed = bip39.mnemonicToSeed(mnemonic)
-  return new blockstack.BlockstackWallet(bip32.fromSeed(seed))
+async function walletFromMnemonic(mnemonic: string): Promise<blockstack.BlockstackWallet> {
+  const seed = await bip39.mnemonicToSeed(mnemonic);
+  return new blockstack.BlockstackWallet(bip32.fromSeed(seed));
 }
 
-function getNodePrivateKey(node: BIP32): string {
-  return blockstack.ecPairToHexString(bitcoin.ECPair.fromPrivateKey(node.privateKey))
+function getNodePrivateKey(node: BIP32Interface): string {
+  return blockstack.ecPairToHexString(bitcoin.ECPair.fromPrivateKey(node.privateKey));
 }
 
 /*
@@ -78,12 +73,12 @@ function getNodePrivateKey(node: BIP32): string {
  *    .version (string) the version string of the derivation
  *    .idAddress (string) the ID-address
  */
-export function getOwnerKeyInfo(network: CLINetworkAdapter,
-                                mnemonic : string, 
-                                index : number, 
-                                version : string = 'v0.10-current'): OwnerKeyInfoType {
+export async function getOwnerKeyInfo(network: CLINetworkAdapter,
+  mnemonic : string, 
+  index : number, 
+  version : string = 'v0.10-current'): Promise<OwnerKeyInfoType> {
 
-  const wallet = walletFromMnemonic(mnemonic);
+  const wallet = await walletFromMnemonic(mnemonic);
   const identity = wallet.getIdentityAddressNode(index);
   const addr = network.coerceAddress(blockstack.BlockstackWallet.getAddressFromBIP32Node(identity));
   const privkey = getNodePrivateKey(identity);
@@ -91,7 +86,7 @@ export function getOwnerKeyInfo(network: CLINetworkAdapter,
     privateKey: privkey,
     version: version,
     index: index,
-    idAddress: `ID-${addr}`,
+    idAddress: `ID-${addr}`
   } as OwnerKeyInfoType;
 }
 
@@ -104,18 +99,19 @@ export function getOwnerKeyInfo(network: CLINetworkAdapter,
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
-export function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : string): PaymentKeyInfoType {
-  const wallet = walletFromMnemonic(mnemonic);
+export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<PaymentKeyInfoType> {
+  const wallet = await walletFromMnemonic(mnemonic);
   const privkey = wallet.getBitcoinPrivateKey(0);
   const addr = getPrivateKeyAddress(network, privkey);
-  return {
+  const result: PaymentKeyInfoType = {
     privateKey: privkey,
     address: {
       BTC: addr,
-      STACKS: c32check.b58ToC32(addr),
+      STACKS: c32check.b58ToC32(addr)
     },
     index: 0
-  } as PaymentKeyInfoType;
+  };
+  return result;
 }
 
 /*
@@ -123,7 +119,7 @@ export function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : string)
  * Returns the index if found
  * Returns -1 if not found
  */
-export function findIdentityIndex(network: CLINetworkAdapter, mnemonic: string, idAddress: string, maxIndex?: number) : number {
+export async function findIdentityIndex(network: CLINetworkAdapter, mnemonic: string, idAddress: string, maxIndex?: number) : Promise<number> {
   if (!maxIndex) {
     maxIndex = getMaxIDSearchIndex();
   }
@@ -132,7 +128,7 @@ export function findIdentityIndex(network: CLINetworkAdapter, mnemonic: string, 
     throw new Error('Not an identity address');
   }
 
-  const wallet = walletFromMnemonic(mnemonic);
+  const wallet = await walletFromMnemonic(mnemonic);
   for (let i = 0; i < maxIndex; i++) {
     const identity = wallet.getIdentityAddressNode(i);
     const addr = blockstack.BlockstackWallet.getAddressFromBIP32Node(identity);
@@ -161,28 +157,28 @@ export function findIdentityIndex(network: CLINetworkAdapter, mnemonic: string, 
  *      .privateKey (string) the app's hex private key
  *      .address (string) the address of the private key
  */
-export function getApplicationKeyInfo(network: CLINetworkAdapter,
-                                      mnemonic : string, 
-                                      idAddress: string, 
-                                      appDomain: string, 
-                                      idIndex?: number) : AppKeyInfoType {
+export async function getApplicationKeyInfo(network: CLINetworkAdapter,
+  mnemonic : string, 
+  idAddress: string, 
+  appDomain: string, 
+  idIndex?: number) : Promise<AppKeyInfoType> {
   if (!idIndex) {
     idIndex = -1;
   }
 
   if (idIndex < 0) {
-    idIndex = findIdentityIndex(network, mnemonic, idAddress);
+    idIndex = await findIdentityIndex(network, mnemonic, idAddress);
     if (idIndex < 0) {
       throw new Error('Identity address does not belong to this keychain');
     }
   }
 
-  const wallet = walletFromMnemonic(mnemonic);
+  const wallet = await walletFromMnemonic(mnemonic);
   const identityOwnerAddressNode = wallet.getIdentityAddressNode(idIndex);
   const appsNode = blockstack.BlockstackWallet.getAppsNode(identityOwnerAddressNode);
 
-  const appPrivateKey = blockstack.BlockstackWallet.getAppPrivateKey(
-    appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
+  //const appPrivateKey = blockstack.BlockstackWallet.getAppPrivateKey(
+  //  appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
   const legacyAppPrivateKey = blockstack.BlockstackWallet.getLegacyAppPrivateKey(
     appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
 
@@ -190,7 +186,7 @@ export function getApplicationKeyInfo(network: CLINetworkAdapter,
   const res : AppKeyInfoType = {
     keyInfo: {
       privateKey: 'TODO', // appPrivateKey,
-      address: 'TODO', // getPrivateKeyAddress(network, `${appPrivateKey}01`)
+      address: 'TODO' // getPrivateKeyAddress(network, `${appPrivateKey}01`)
     },
     legacyKeyInfo: {
       privateKey: legacyAppPrivateKey,
@@ -219,7 +215,7 @@ export function extractAppKey(
   }
 
   const appPrivateKey = (appKeyInfo.keyInfo.privateKey === 'TODO' || !appKeyInfo.keyInfo.privateKey ?
-                         appKeyInfo.legacyKeyInfo.privateKey :
-                         appKeyInfo.keyInfo.privateKey);
+    appKeyInfo.legacyKeyInfo.privateKey :
+    appKeyInfo.keyInfo.privateKey);
   return appPrivateKey;
 }
