@@ -102,7 +102,6 @@ interface AuthRequestType {
 
 // new ecdsa private key each time
 const authTransitKey = crypto.randomBytes(32).toString('hex');
-getPublicKeyFromPrivateKey(authTransitKey);
 const authTransitNonce = crypto.randomBytes(32).toString('hex');
 
 
@@ -402,13 +401,16 @@ export async function handleAuth(network: CLINetworkAdapter,
     }
     errorMsg = 'Unable to fetch app manifest';
     const appManifest = await blockstack.fetchAppManifest(authToken);
-        
+
+    errorMsg = 'Unable to decode token';
     const decodedAuthToken = jsontokens.decodeToken(authToken);
     const decodedAuthPayload = decodedAuthToken.payload;
     if (!decodedAuthPayload) {
       errorMsg = 'Invalid authentication token: no payload';
       throw new Error(errorMsg);
     }
+
+    errorMsg = 'Unable to make auth page';
 
     // make sign-in page
     const authPage = await makeAuthPage(
@@ -422,7 +424,7 @@ export async function handleAuth(network: CLINetworkAdapter,
       errorMsg = e.message;
     }
 
-    logger.error(e);
+    console.log(e.stack);
     logger.error(errorMsg);
     sendJSON(res, { error: `Unable to authenticate app request: ${errorMsg}` }, 400);
   }
