@@ -1,10 +1,10 @@
-import logger from 'winston';
+import * as logger from 'winston';
 import * as bitcoinjs from 'bitcoinjs-lib';
 import * as URL from 'url';
-import readline from 'readline';
-import stream from 'stream';
-import fs from 'fs';
-import blockstack from 'blockstack';
+import * as readline from 'readline';
+import * as stream from 'stream';
+import * as fs from 'fs';
+import * as blockstack from 'blockstack';
 
 const ZoneFile = require('zone-file');
 

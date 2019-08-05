@@ -1,6 +1,6 @@
-import Ajv from 'ajv';
-import process from 'process';
-import fs from 'fs';
+import * as Ajv from 'ajv';
+import * as process from 'process';
+import * as fs from 'fs';
 
 export const NAME_PATTERN = 
   '^([0-9a-z_.+-]{3,37})$';

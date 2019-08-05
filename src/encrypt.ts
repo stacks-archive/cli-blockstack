@@ -1,4 +1,4 @@
-import blockstack from 'blockstack';
+import * as blockstack from 'blockstack';
 
 export function encryptBackupPhrase(plaintextBuffer: string, password: string) : Promise<Buffer> {
   return blockstack.encryptMnemonic(plaintextBuffer, password);

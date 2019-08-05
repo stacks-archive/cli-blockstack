@@ -1,7 +1,7 @@
-import blockstack from 'blockstack';
+import * as blockstack from 'blockstack';
 import * as URL from 'url';
-import crypto from 'crypto';
-import jsontokens from 'jsontokens';
+import * as crypto from 'crypto';
+import * as jsontokens from 'jsontokens';
 
 const ZoneFile = require('zone-file');
 
