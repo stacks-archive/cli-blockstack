@@ -1,6 +1,6 @@
 import blockstack from 'blockstack';
 import * as bitcoin from 'bitcoinjs-lib';
-import BN from 'bn.js';
+const BN = require('bn.js');
 import fetch from 'node-fetch';
 
 import {
@@ -29,7 +29,7 @@ export interface CLI_NETWORK_OPTS {
 
 export interface PriceType {
   units: 'BTC' | 'STACKS';
-  amount: BN
+  amount: import('bn.js')
 };
 
 export interface NameInfoType {

@@ -1,16 +1,16 @@
-import blockstack from 'blockstack';
+import * as blockstack from 'blockstack';
 import * as bitcoin from 'bitcoinjs-lib';
-import process from 'process';
-import fs from 'fs';
-import winston from 'winston';
-import logger from 'winston';
-import cors from 'cors';
-import RIPEMD160 from 'ripemd160';
-import BN from 'bn.js';
-import crypto from 'crypto';
+import * as process from 'process';
+import * as fs from 'fs';
+import * as winston from 'winston';
+import * as logger from 'winston';
+import * as cors from 'cors';
+import * as RIPEMD160 from 'ripemd160';
+const BN = require('bn.js');
+import * as crypto from 'crypto';
 import * as bip39 from 'bip39';
-import express from 'express';
-import path from 'path';
+import * as express from 'express';
+import * as path from 'path';
 import fetch from 'node-fetch';
 
 const c32check = require('c32check');
@@ -2416,7 +2416,7 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
           return Promise.resolve().then(() => {
             return network.getAccountBalance(address, tokenType);
           })
-            .then((tokenBalance : BN) => {
+            .then((tokenBalance : import('bn.js')) => {
               return {
                 'token': tokenType,
                 'amount': tokenBalance.toString()

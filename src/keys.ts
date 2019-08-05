@@ -1,7 +1,7 @@
 // TODO: most of this code should be in blockstack.js
 // Will remove most of this code once the wallet functionality is there instead.
 
-import blockstack from 'blockstack';
+import * as blockstack from 'blockstack';
 import * as bitcoin from 'bitcoinjs-lib';
 import * as bip39 from 'bip39';
 

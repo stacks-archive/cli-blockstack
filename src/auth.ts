@@ -1,8 +1,8 @@
-import blockstack from 'blockstack';
-import express from 'express';
-import crypto from 'crypto';
-import jsontokens from 'jsontokens';
-import logger from 'winston';
+import * as blockstack from 'blockstack';
+import * as express from 'express';
+import * as crypto from 'crypto';
+import * as jsontokens from 'jsontokens';
+import * as logger from 'winston';
 
 import {
   gaiaConnect,
