@@ -8,7 +8,7 @@ import cors from 'cors';
 import RIPEMD160 from 'ripemd160';
 import BN from 'bn.js';
 import crypto from 'crypto';
-import bip39 from 'bip39';
+import * as bip39 from 'bip39';
 import express from 'express';
 import path from 'path';
 import fetch from 'node-fetch';
@@ -2303,17 +2303,13 @@ function zonefilePush(network: CLINetworkAdapter, args: string[]) : Promise<stri
  * @nameOrIDAddress (string) the name or ID-address
  * @appOrigin (string) the application's origin URL
  */
-function getAppKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const mnemonicPromise = getBackupPhrase(args[0]);
+async function getAppKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const mnemonic = await getBackupPhrase(args[0]);
   const nameOrIDAddress = args[1];
   const origin = args[2];
-  let idAddress : string;
-  return getIDAddress(network, nameOrIDAddress).then((idAddr : string) => {
-    idAddress = idAddr;
-    return mnemonicPromise;
-  })
-    .then((mnemonic : string) => JSONStringify(
-      getApplicationKeyInfo(network, mnemonic, idAddress, origin)));
+  const idAddress = await getIDAddress(network, nameOrIDAddress);
+  const networkInfo = await getApplicationKeyInfo(network, mnemonic, idAddress, origin);
+  return JSONStringify(networkInfo);
 }
 
 /*

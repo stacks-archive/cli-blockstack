@@ -3,7 +3,7 @@
 
 import blockstack from 'blockstack';
 import * as bitcoin from 'bitcoinjs-lib';
-import bip39 from 'bip39';
+import * as bip39 from 'bip39';
 
 const c32check = require('c32check');
 
@@ -19,7 +19,8 @@ import {
   CLINetworkAdapter
 } from './network';
 
-import bip32, { BIP32Interface } from 'bip32';
+import * as bip32 from 'bip32';
+import { BIP32Interface } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
 
