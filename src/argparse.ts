@@ -169,6 +169,7 @@ export const CLI_ARGS = {
       'network will process it once the transaction reaches 7 confirmations.\n' +
       '\n' +
       'Examples:\n' + 
+      '\n' +
       '    $ # Tip: You can obtain the owner key with the get_owner_keys command\n' +
       '    $ export OWNER_KEY="136ff26efa5db6f06b28f9c8c7a0216a1a52598045162abfe435d13036154a1b01"\n' +
       '    $ blockstack-cli announce 737c631c7c5d911c6617993c21fba731363f1cfe "$OWNER_KEY"\n' +
