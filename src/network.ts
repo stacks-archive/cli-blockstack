@@ -32,7 +32,7 @@ export interface PriceType {
   amount: import('bn.js')
 };
 
-export interface NameInfoType {
+export type NameInfoType = {
   address: string;
   blockchain: string;
   did: string;
@@ -44,7 +44,7 @@ export interface NameInfoType {
   status: string;
   zonefile: string | null;
   zonefile_hash: string | null;
-}
+};
 
 /*
  * Adapter class that allows us to use data obtained

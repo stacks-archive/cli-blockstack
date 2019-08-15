@@ -185,8 +185,8 @@ export class SegwitP2SHKeySigner extends CLITransactionSigner {
 }
 
 export class SafetyError extends Error {
-  safetyErrors: Object;
-  constructor(safetyErrors: Object) {
+  safetyErrors: AnyJson;
+  constructor(safetyErrors: AnyJson) {
     super(JSONStringify(safetyErrors, true));
     this.safetyErrors = safetyErrors;
   }
@@ -351,12 +351,16 @@ export function decodePrivateKey(serializedPrivateKey: string) : string | CLITra
   throw new Error('Unparseable private key');
 }
 
+type AnyJson = boolean | number | string | null | JsonArray | JsonMap;
+interface JsonMap { [key: string]: AnyJson; }
+interface JsonArray extends Array<AnyJson> {}
+
 /*
  * JSON stringify helper
  * -- if stdout is a TTY, then pretty-format the JSON
  * -- otherwise, print it all on one line to make it easy for programs to consume
  */
-export function JSONStringify(obj: any, stderr: boolean = false) : string {
+export function JSONStringify(obj: AnyJson, stderr: boolean = false) : string {
   if ((!stderr && process.stdout.isTTY) || (stderr && process.stderr.isTTY)) {
     return JSON.stringify(obj, null, 2);
   }

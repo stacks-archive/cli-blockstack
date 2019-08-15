@@ -24,14 +24,14 @@ import { BIP32Interface } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
 
-export interface OwnerKeyInfoType {
+export type OwnerKeyInfoType = {
   privateKey: string;
   version: string;
   index: number;
   idAddress: string;
 };
 
-export interface PaymentKeyInfoType {
+export type PaymentKeyInfoType = {
   privateKey: string;
   address: {
     BTC: string;
@@ -40,7 +40,7 @@ export interface PaymentKeyInfoType {
   index: number
 };
 
-export interface AppKeyInfoType {
+export type AppKeyInfoType = {
   keyInfo: {
     privateKey: string;
     address: string;
