@@ -19,8 +19,7 @@ import {
 
 import {
   nameLookup,
-  makeProfileJWT,
-  getPublicKeyFromPrivateKey
+  makeProfileJWT
 } from './utils';
 
 import {
@@ -101,7 +100,6 @@ interface AuthRequestType {
 
 
 // new ecdsa private key each time
-const authTransitKey = crypto.randomBytes(32).toString('hex');
 const authTransitNonce = crypto.randomBytes(32).toString('hex');
 
 
@@ -393,7 +391,7 @@ export async function handleAuth(network: CLINetworkAdapter,
     identities = await getIdentityInfo(network, mnemonic, gaiaHubUrl, profileGaiaHub);
 
     errorMsg = 'Unable to verify authentication token';
-    const valid = blockstack.verifyAuthRequest(authToken);
+    const valid = await blockstack.verifyAuthRequest(authToken);
         
     if (!valid) {
       errorMsg = 'Invalid authentication token: could not verify';

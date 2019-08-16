@@ -28,7 +28,9 @@ import {
   getPaymentKeyInfo,
   getApplicationKeyInfo,
   extractAppKey,
-  STRENGTH
+  STRENGTH,
+  PaymentKeyInfoType,
+  OwnerKeyInfoType
 } from './keys';
 
 import {
@@ -272,28 +274,23 @@ function getNameBlockchainRecord(network: CLINetworkAdapter, args: string[]) : P
 /*
  * Get all of a name's history
  */
-
-function getAllNameHistoryPages(network: CLINetworkAdapter, name: string, page: number) {
-  return new Promise((resolve, _reject) => {
-    let history = {};
-    return network.getNameHistory(name, page)
-      .then((results : any) => {
-        if (Object.keys(results).length == 0) {
-          resolve(history);
-        }
-        else {
-          history = Object.assign(history, results);
-          getAllNameHistoryPages(network, name, page + 1)
-            .then((rest : any) => {
-              history = Object.assign(history, rest);
-              resolve(history);
-            });
-        }
-      })
-      .catch((_e) => {
-        resolve(history);
-      });
-  });
+async function getAllNameHistoryPages(network: CLINetworkAdapter, name: string, page: number) {
+  let history = {};
+  try {
+    const results = await network.getNameHistory(name, page);
+    if (Object.keys(results).length == 0) {
+      return history;
+    }
+    else {
+      history = Object.assign(history, results);
+      const rest = await getAllNameHistoryPages(network, name, page + 1);
+      history = Object.assign(history, rest);
+      return history;
+    }
+  }
+  catch (_e) {
+    return history;
+  }
 }
 
 /*
@@ -960,7 +957,7 @@ function getLastZonefileHash(network: CLINetworkAdapter, name: string): Promise<
  * @zonefilePath (string) OPTIONAL: the path to the new zone file
  * @zonefileHash (string) OPTINOAL: use the given zonefile hash.  Supercedes zonefile.
  */
-function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const paymentKey = decodePrivateKey(args[2]);
@@ -1013,28 +1010,19 @@ function renew(network: CLINetworkAdapter, args: string[]) : Promise<string> {
         numOwnerUTXOs + numPaymentUTXOs - 1);
     });
 
-  const zonefileHashPromise = new Promise((resolve : any, reject : any) => {
-    if (!!zonefile) {
-      const sha256 = bitcoin.crypto.sha256(new Buffer(zonefile));
-      const h = (new RIPEMD160()).update(sha256).digest('hex');
-      resolve(h);
-    } else if (!!zonefileHash || blankZonefileHash) {
-      // already have the hash 
-      resolve(zonefileHash);
-    } else {
-      return getLastZonefileHash(network, name)
-        .then((zfh : string) => resolve(zfh))
-        .catch((e : Error) => reject(e));
-    }
-  })
-    .catch((e : Error) => {
-      console.error(e);
-    });
+  let zfh: string;
+  if (!!zonefile) {
+    const sha256 = bitcoin.crypto.sha256(new Buffer(zonefile));
+    zfh = (new RIPEMD160()).update(sha256).digest('hex');
+  } else if (!!zonefileHash || blankZonefileHash) {
+    // already have the hash 
+    zfh = zonefileHash;
+  } else {
+    zfh = await getLastZonefileHash(network, name);
+  }
 
-  const txPromise = zonefileHashPromise.then((zfh : string) => {
-    return blockstack.transactions.makeRenewal(
-      name, newAddress, ownerKey, paymentKey, zonefile, zfh, !hasKeys(ownerKey) || !hasKeys(paymentKey));
-  });
+  const txPromise = blockstack.transactions.makeRenewal(
+    name, newAddress, ownerKey, paymentKey, zonefile, zfh, !hasKeys(ownerKey) || !hasKeys(paymentKey));
 
   if (estimateOnly) {
     return estimatePromise
@@ -2318,21 +2306,19 @@ async function getAppKeys(network: CLINetworkAdapter, args: string[]) : Promise<
  * @mnemonic (string) the 12-word phrase
  * @max_index (integer) (optional) the profile index maximum
  */
-function getOwnerKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const mnemonicPromise = getBackupPhrase(args[0]);
+async function getOwnerKeys(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const mnemonic = await getBackupPhrase(args[0]);
   let maxIndex = 1;
   if (args.length > 1 && !!args[1]) {
     maxIndex = parseInt(args[1]);
   }
 
-  return mnemonicPromise.then((mnemonic : string) => {
-    const keyInfo = [];
-    for (let i = 0; i < maxIndex; i++) {
-      keyInfo.push(getOwnerKeyInfo(network, mnemonic, i));
-    }
- 
-    return JSONStringify(keyInfo);
-  });
+  const keyInfo: OwnerKeyInfoType[] = [];
+  for (let i = 0; i < maxIndex; i++) {
+    keyInfo.push(await getOwnerKeyInfo(network, mnemonic, i));
+  }
+
+  return JSONStringify(keyInfo);
 }
 
 /*
@@ -2340,16 +2326,13 @@ function getOwnerKeys(network: CLINetworkAdapter, args: string[]) : Promise<stri
  * args:
  * @mnemonic (string) the 12-word phrase
  */
-function getPaymentKey(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const mnemonicPromise = getBackupPhrase(args[0]);
-  
-  return mnemonicPromise.then((mnemonic : string) => {
-    // keep the return value consistent with getOwnerKeys 
-    const keyObj = getPaymentKeyInfo(network, mnemonic);
-    const keyInfo = [];
-    keyInfo.push(keyObj);
-    return JSONStringify(keyInfo);
-  });
+async function getPaymentKey(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const mnemonic = await getBackupPhrase(args[0]);
+  // keep the return value consistent with getOwnerKeys 
+  const keyObj = await getPaymentKeyInfo(network, mnemonic);
+  const keyInfo: PaymentKeyInfoType[] = [];
+  keyInfo.push(keyObj);
+  return JSONStringify(keyInfo);
 }
 
 /*
@@ -2357,18 +2340,20 @@ function getPaymentKey(network: CLINetworkAdapter, args: string[]) : Promise<str
  * args:
  * @mnemonic (string) OPTIONAL; the 12-word phrase
  */
-function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const mnemonicPromise = (args[0] ? getBackupPhrase(args[0]) : 
-    Promise.resolve().then(() => bip39.generateMnemonic(STRENGTH, crypto.randomBytes)));
+async function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  let mnemonic: string;
+  if (args[0]) {
+    mnemonic = await getBackupPhrase(args[0]);
+  } else {
+    mnemonic = await bip39.generateMnemonic(STRENGTH, crypto.randomBytes);
+  }
 
-  return mnemonicPromise.then((mnemonic : string) => {
-    const ownerKeyInfo = getOwnerKeyInfo(network, mnemonic, 0);
-    const paymentKeyInfo = getPaymentKeyInfo(network, mnemonic);
-    return JSONStringify({
-      'mnemonic': mnemonic,
-      'ownerKeyInfo': ownerKeyInfo,
-      'paymentKeyInfo': paymentKeyInfo
-    });
+  const ownerKeyInfo = await getOwnerKeyInfo(network, mnemonic, 0);
+  const paymentKeyInfo = await getPaymentKeyInfo(network, mnemonic);
+  return JSONStringify({
+    'mnemonic': mnemonic,
+    'ownerKeyInfo': ownerKeyInfo,
+    'paymentKeyInfo': paymentKeyInfo
   });
 }
 
@@ -3309,19 +3294,19 @@ function decryptMnemonic(network: CLINetworkAdapter, args: string[]) : Promise<s
 
 /* Print out all documentation on usage in JSON 
  */
-interface DocsArgsType {
+type DocsArgsType = {
   name: string;
   type: string;
   value: string;
   format: string;
-}
+};
 
-interface FormattedDocsType {
+type FormattedDocsType = {
   command: string;
   args: DocsArgsType[];
   usage: string;
   group: string
-}
+};
 
 function printDocs(_network: CLINetworkAdapter, _args: string[]) : Promise<string> {
   return Promise.resolve().then(() => {
