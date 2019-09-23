@@ -160,9 +160,9 @@ export const CLI_ARGS = {
       minItems: 2,
       maxItems: 2,
       help: 'Broadcast a message on the blockchain for subscribers to read.  ' +
-      'The MESSAGE_HASH argument must be the hash of a previously-announced zone file.  ' +
-      'The OWNER_KEY used to sign the transaction must correspond to the Blockstack ID ' +
-      'to which other users have already subscribed.  OWNER_KEY can be a single private key ' +
+      'The `MESSAGE_HASH` argument must be the hash of a previously-announced zone file.  ' +
+      'The `OWNER_KEY` used to sign the transaction must correspond to the Blockstack ID ' +
+      'to which other users have already subscribed.  `OWNER_KEY` can be a single private key ' +
       'or a serialized multisig private key bundle.\n' +
       '\n' +
       'If this command succeeds, it will print a transaction ID.  The rest of the Blockstack peer ' +
@@ -349,7 +349,7 @@ export const CLI_ARGS = {
       minItems: 1,
       maxItems: 2,
       help: 'Encrypt a 12-word backup phrase, which can be decrypted later with the ' +
-      'decrypt_backup_phrase command.  The password will be prompted if not given.\n' +
+      '`decrypt_backup_phrase` command.  The password will be prompted if not given.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -395,9 +395,9 @@ export const CLI_ARGS = {
       ],
       minItems: 5,
       maxItems: 5,
-      help: 'Download the contents of a Gaia hub bucket to a given directory.  The GAIA_HUB argument ' +
+      help: 'Download the contents of a Gaia hub bucket to a given directory.  The `GAIA_HUB` argument ' +
       'must correspond to the *write* endpoint of the Gaia hub -- that is, you should be able to fetch ' +
-      '$GAIA_HUB/hub_info.  If DUMP_DIR does not exist, it will be created.\n' +
+      '`$GAIA_HUB/hub_info`.  If `DUMP_DIR` does not exist, it will be created.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -454,16 +454,16 @@ export const CLI_ARGS = {
       maxItems: 6,
       help: 'Get a file from another user\'s Gaia hub.  Prints the file data to stdout.  If you ' +
       'want to read an encrypted file, and/or verify a signed file, then you must pass an app ' +
-      'private key, and pass 1 for DECRYPT and/or VERIFY.  If the file is encrypted, and you do not ' +
+      'private key, and pass 1 for `DECRYPT` and/or `VERIFY`.  If the file is encrypted, and you do not ' +
       'pass an app private key, then this command downloads the ciphertext.  If the file is signed, ' +
       'and you want to download its data and its signature, then you must run this command twice -- ' +
-      'once to get the file contents at FILENAME, and once to get the signature (whose name will be FILENAME.sig).\n' +
+      'once to get the file contents at `FILENAME`, and once to get the signature (whose name will be `FILENAME`.sig).\n' +
       '\n' +
       'Gaia is a key-value store, so it does not have any built-in notion of directories.  However, ' +
       'most underlying storage systems do -- directory separators in the name of a file in ' +
       'Gaia may be internally treated as first-class directories (it depends on the Gaia hub\'s driver).' +
       'As such, repeated directory separators will be treated as a single directory separator by this command.  ' +
-      'For example, the file name a/b.txt, /a/b.txt, and ///a////b.txt will be treated as identical.\n' +
+      'For example, the file name `a/b.txt`, `/a/b.txt`, and `///a////b.txt` will be treated as identical.\n' +
       '\n' +
       'Example without encryption:\n' +
       '\n' + 
@@ -532,7 +532,7 @@ export const CLI_ARGS = {
       'most underlying storage systems do -- directory separators in the name of a file in ' +
       'Gaia may be internally treated as first-class directories (it depends on the Gaia hub\'s driver).' +
       'As such, repeated directory separators will be treated as a single directory separator by this command.  ' +
-      'For example, the file name a/b.txt, /a/b.txt, and ///a////b.txt will be treated as identical.\n' +
+      'For example, the file name `a/b.txt`, `/a/b.txt`, and `///a////b.txt` will be treated as identical.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -625,10 +625,10 @@ export const CLI_ARGS = {
       ],
       minItems: 5,
       maxItems: 5,
-      help: 'Upload the contents of a previously-dumped Gaia bucket to a new Gaia hub.  The GAIA_HUB argument ' +
+      help: 'Upload the contents of a previously-dumped Gaia bucket to a new Gaia hub.  The `GAIA_HUB` argument ' +
       'must correspond to the *write* endpoint of the Gaia hub -- that is, you should be able to fetch ' +
-      '$GAIA_HUB/hub_info.  DUMP_DIR must contain the file contents created by a previous successful run of the gaia_dump_bucket command, ' +
-      'and both NAME_OR_ID_ADDRESS and APP_ORIGIN must be the same as they were when it was run.\n' +
+      '`$GAIA_HUB/hub_info`.  `DUMP_DIR` must contain the file contents created by a previous successful run of the gaia_dump_bucket command, ' +
+      'and both `NAME_OR_ID_ADDRESS` and `APP_ORIGIN` must be the same as they were when it was run.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -677,8 +677,9 @@ export const CLI_ARGS = {
       maxItems: 5,
       help: 'Set the Gaia hub for a particular application for a Blockstack ID.  If the command succeeds, ' +
       'the URLs to your updated profile will be printed and your profile will contain an entry in its "apps" ' +
-      'key that links the given APP_ORIGIN to the given APP_GAIA_HUB.  Note that both OWNER_GAIA_HUB and ' +
-      'APP_GAIA_HUB must be the *write* endpoints of their respective Gaia hubs.\n' +
+      'key that links the given `APP_ORIGIN` to the given `APP_GAIA_HUB`.\n' + 
+      '\n' +
+      'NOTE: Both `OWNER_GAIA_HUB` and `APP_GAIA_HUB` must be the *write* endpoints of their respective Gaia hubs.\n' +
       '\n' +
       'Your 12-word phrase (in either raw or encrypted form) is required to re-sign and store your ' +
       'profile and to generate an app-specific key and Gaia bucket.  If you give the encrypted backup phrase, you will be prompted for a password.\n' +
@@ -875,7 +876,7 @@ export const CLI_ARGS = {
       ],
       minItems: 1,
       maxItems: 2,
-      help: 'Get the low-level blockchain-hosted history of operations on a Blocktack ID.  ' +
+      help: 'Get the low-level blockchain-hosted history of operations on a Blockstack ID.  ' +
       'This command is used mainly for debugging and diagnostics, and is not guaranteed to ' +
       'be stable across releases.',
       group: 'Querying Blockstack IDs'
@@ -948,12 +949,14 @@ export const CLI_ARGS = {
       'This is the private key used to sign data in Gaia, and its address is the Gaia bucket ' +
       'address.  If you provide your encrypted backup phrase, you will be asked to decrypt it.  ' +
       'If you provide a name instead of an ID-address, its ID-address will be queried automatically ' +
-      '(note that this means that the name must already be registered).  Note that this command does NOT ' +
-      'verify whether or not the name or ID-address was created by the backup phrase.  You should do this yourself ' +
-      'via the "get_owner_keys" command if you are not sure.\n' +
-      'There are two derivation paths emitted by this command:  a "keyInfo" path and a "legacyKeyInfo"' +
+      '(note that this means that the name must already be registered).\n' + 
+      '\n' +
+      'NOTE: This command does NOT verify whether or not the name or ID-address was created by the ' + 
+      'backup phrase. You should do this yourself via the `get_owner_keys` command if you are not sure.\n' +
+      '\n' +
+      'There are two derivation paths emitted by this command:  a `keyInfo` path and a `legacyKeyInfo`' +
       'path.  You should use the one that matches the Gaia hub read URL\'s address, if you have already ' +
-      'signed in before.  If not, then you should use the "keyInfo" path when possible.\n' +
+      'signed in before.  If not, then you should use the `keyInfo` path when possible.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -1203,8 +1206,8 @@ export const CLI_ARGS = {
       '\n' +
       '     {GAIA_URL_PREFIX}/{ADDRESS}/profile.json\n' +
       '\n' +
-      'where {GAIA_URL_PREFIX} is the *read* endpoint of your Gaia hub (e.g. https://gaia.blockstack.org/hub) and ' +
-      '{ADDRESS} is the base58check part of your ID-address (i.e. the string following \'ID-\').\n' +
+      'where `{GAIA_URL_PREFIX}` is the *read* endpoint of your Gaia hub (e.g. https://gaia.blockstack.org/hub) and ' +
+      '`{ADDRESS}` is the base58check part of your ID-address (i.e. the string following \'ID-\').\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -1257,27 +1260,27 @@ export const CLI_ARGS = {
       ],
       minItems: 4,
       maxItems: 6,
-      help: 'Import a name into a namespace you revealed.  The REVEAL_KEY must be the same as ' +
+      help: 'Import a name into a namespace you revealed.  The `REVEAL_KEY` must be the same as ' +
       'the key that revealed the namespace.  You can only import a name into a namespace if ' +
       'the namespace has not yet been launched (i.e. via `namespace_ready`), and if the ' +
       'namespace was revealed less than a year ago (52595 blocks ago).\n' +
       '\n' +
       'A zone file will be generated for this name automatically, if "ZONEFILE" is not given.  By default, ' +
-      'the zone file will have a URL to the name owner\'s profile prefixed by GAIA_URL_PREFIX.  If you ' +
-      'know the *write* endpoint for the name owner\'s Gaia hub, you can find out the GAIA_URL_PREFIX ' +
-      'to use with "curl $GAIA_HUB/hub_info".\n' +
+      'the zone file will have a URL to the name owner\'s profile prefixed by `GAIA_URL_PREFIX`.  If you ' +
+      'know the *write* endpoint for the name owner\'s Gaia hub, you can find out the `GAIA_URL_PREFIX` ' +
+      'to use with `curl $GAIA_HUB/hub_info`".\n' +
       '\n' +
-      'If you specify an argument for "ZONEFILE," then the GAIA_URL_PREFIX argument is ignored in favor of ' +
+      'If you specify an argument for `ZONEFILE`, then the `GAIA_URL_PREFIX` argument is ignored in favor of ' +
       'your custom zone file on disk.\n' +
       '\n' +
-      'If you specify a valid zone file hash for "ZONEFILE_HASH," then it will be used in favor of ' +
-      'both ZONEFILE and GAIA_URL_PREFIX.  The zone file hash will be incorporated directly into the ' +
+      'If you specify a valid zone file hash for `ZONEFILE_HASH` then it will be used in favor of ' +
+      'both `ZONEFILE` and `GAIA_URL_PREFIX`.  The zone file hash will be incorporated directly into the ' +
       'name-import transaction.\n' +
       '\n' +
       'This command prints out a transaction ID if it succeeds, and it replicates the zone file (if given) ' +
       'to a transaction broadcaster (you can choose which one with -T).  The zone file will be automatically ' +
       'broadcast to the Blockstack peer network when the transaction confirms.  Alternatively, you can do so ' +
-      'yourself with the "zonefile_push" command.\n' +
+      'yourself with the `zonefile_push` command.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -1392,7 +1395,7 @@ export const CLI_ARGS = {
       maxItems: 10,
       help: 'Reveal a preordered namespace, and set the price curve and payment options.  ' +
       'This is the second of three steps required to create a namespace, and must be done ' +
-      'shortly after the associated "namespace_preorder" command.',
+      'shortly after the associated `namespace_preorder` command.',
       group: 'Namespace Operations'
     },
     namespace_ready: {
@@ -1521,7 +1524,7 @@ export const CLI_ARGS = {
       minItems: 4,
       maxItems: 4,
       help: 'Store a profile on disk to a Gaia hub.  USER_ID can be either a Blockstack ID or ' +
-      'an ID-address.  The GAIA_HUB argument must be the *write* endpoint for the user\'s Gaia hub ' +
+      'an ID-address.  The `GAIA_HUB` argument must be the *write* endpoint for the user\'s Gaia hub ' +
       '(e.g. https://hub.blockstack.org).  You can verify this by ensuring that you can run \'curl ' +
       '"$GAIA_HUB/hub_info"\' successfully.',
       group: 'Profiles'
@@ -1595,14 +1598,14 @@ export const CLI_ARGS = {
       ],
       minItems: 3,
       maxItems: 6,
-      help: 'Renew a name.  Optionally transfer it to a new owner address (NEW_ID_ADDRESS), ' +
-      'and optionally load up and give it a new zone file on disk (ZONEFILE).  If the command ' +
+      help: 'Renew a name.  Optionally transfer it to a new owner address (`NEW_ID_ADDRESS`), ' +
+      'and optionally load up and give it a new zone file on disk (`ZONEFILE`).  If the command ' +
       'succeeds, it prints out a transaction ID.  You can use with the "get_confirmations" ' +
       'command to track its confirmations on the underlying blockchain -- once it reaches 7 ' +
       'confirmations, the rest of the Blockstack peer network will process it.\n' +
       '\n' +
       'If you create a new zonefile for your name, you will need ' +
-      'to later use "zonefile_push" to replicate the zone file to the Blockstack peer network ' +
+      'to later use `zonefile_push` to replicate the zone file to the Blockstack peer network ' +
       'once the transaction reaches 7 confirmations.\n' +
       '\n' +
       'Example:\n' +
@@ -1675,24 +1678,24 @@ export const CLI_ARGS = {
       '\n' +
       'Register a name to a single name-owning private key.  After successfully running this command, ' +
       'and after waiting a couple hours, your name will be ready to use and will resolve to a ' + 
-      'signed empty profile hosted on the given Gaia hub (GAIA_HUB).\n' +
+      'signed empty profile hosted on the given Gaia hub (`GAIA_HUB`).\n' +
       '\n' +
       'Behind the scenes, this will generate and send two transactions ' +
-      'and generate and replicate a zone file with the given Gaia hub URL (GAIA_HUB).  ' +
-      'Note that the GAIA_HUB argument must correspond to the *write* endpoint of the Gaia hub ' +
+      'and generate and replicate a zone file with the given Gaia hub URL (`GAIA_HUB`).  ' +
+      'Note that the `GAIA_HUB` argument must correspond to the *write* endpoint of the Gaia hub ' +
       '(i.e. you should be able to run \'curl "$GAIA_HUB/hub_info"\' and get back data).  If you ' +
       'are using Blockstack PBC\'s default Gaia hub, pass "https://hub.blockstack.org" for this ' +
       'argument.\n' +
       '\n' +
       'By default, this command generates a zone file automatically that points to the Gaia hub\'s ' +
-      'read endpoint (which is queried on-the-fly from GAIA_HUB).  If you instead want to have a custom zone file for this name, ' +
-      'you can specify a path to it on disk with the ZONEFILE argument.\n' +
+      'read endpoint (which is queried on-the-fly from `GAIA_HUB`).  If you instead want to have a custom zone file for this name, ' +
+      'you can specify a path to it on disk with the `ZONEFILE` argument.\n' +
       '\n' +
       'If this command completes successfully, your name will be ready to use once both transactions have 7+ confirmations.  ' +
       'You can use the "get_confirmations" command to track the confirmations ' +
       'on the transaction IDs returned by this command.\n' +
       '\n' +
-      'WARNING: You should *NOT* use the payment private key (PAYMENT_KEY) while the name is being confirmed.  ' +
+      'WARNING: You should *NOT* use the payment private key (`PAYMENT_KEY`) while the name is being confirmed.  ' +
       'If you do so, you could double-spend one of the pending transactions and lose your name.\n' +
       '\n' +
       'Example:\n' +
@@ -1748,22 +1751,22 @@ export const CLI_ARGS = {
       '\n' +
       'Behind the scenes, this command will generate two ' +
       'transactions, and generate and replicate a zone file with the given Gaia hub read URL ' +
-      '(GAIA_URL_PREFIX).  Note that the GAIA_URL_PREFIX argument must correspond to the *read* endpoint of the Gaia hub ' +
+      '(`GAIA_URL_PREFIX`).  Note that the `GAIA_URL_PREFIX` argument must correspond to the *read* endpoint of the Gaia hub ' +
       '(e.g. if you are using Blockstack PBC\'s default Gaia hub, this is "https://gaia.blockstack.org/hub"). ' +
       'If you know the *write* endpoint of the name owner\'s Gaia hub, you can find the right value for ' +
-      'GAIA_URL_PREFIX by running "curl $GAIA_HUB/hub_info".\n' +
+      '`GAIA_URL_PREFIX` by running "curl $GAIA_HUB/hub_info".\n' +
       '\n' +
       'No profile will be generated or uploaded by this command.  Instead, this command generates ' +
-      'a zone file that will include the URL to a profile based on the GAIA_URL_PREFIX argument.\n' +
+      'a zone file that will include the URL to a profile based on the `GAIA_URL_PREFIX` argument.\n' +
       '\n' +
-      'The zone file will be generated automatically from the GAIA_URL_PREFIX argument.  If you need ' +
-      'to use a custom zone file, you can pass the path to it on disk via the ZONEFILE argument.\n' +
+      'The zone file will be generated automatically from the `GAIA_URL_PREFIX` argument.  If you need ' +
+      'to use a custom zone file, you can pass the path to it on disk via the `ZONEFILE` argument.\n' +
       '\n' +
       'If this command completes successfully, the name will be ready to use in a couple of ' +
       'hours---that is, once both transactions have 7+ confirmations. ' +
       'You can use the "get_confirmations" command to track the confirmations.\n' +
       '\n' +
-      'WARNING: You should *NOT* use the payment private key (PAYMENT_KEY) while the name is being confirmed.  ' +
+      'WARNING: You should *NOT* use the payment private key (`PAYMENT_KEY`) while the name is being confirmed.  ' +
       'If you do so, you could double-spend one of the pending transactions and lose the name.\n' +
       '\n' +
       'Example:\n' +
@@ -1807,9 +1810,9 @@ export const CLI_ARGS = {
       minItems: 4,
       maxItems: 5,
       help: 'Register a subdomain.  This will generate and sign a subdomain zone file record ' +
-      'with the given GAIA_HUB URL and send it to the given subdomain registrar (REGISTRAR).\n' +
+      'with the given `GAIA_HUB` URL and send it to the given subdomain registrar (`REGISTRAR`).\n' +
       '\n' +
-      'This command generates, signs, and uploads a profile to the GAIA_HUB url.  Note that the GAIA_HUB ' +
+      'This command generates, signs, and uploads a profile to the `GAIA_HUB` url.  Note that the `GAIA_HUB` ' +
       'argument must correspond to the *write* endpoint of your Gaia hub (i.e. you should be able ' +
       'to run \'curl "$GAIA_HUB/hub_info"\' successfully).  If you are using Blockstack PBC\'s default ' +
       'Gaia hub, this argument should be "https://hub.blockstack.org".\n' +
@@ -1892,7 +1895,7 @@ export const CLI_ARGS = {
       'minus the transaction fee.  For example, if you want to send 10000 satoshis but the ' +
       'transaction fee is 2000 satoshis, then the resulting transaction will send 8000 satoshis ' +
       'to the given address.  This is to ensure that this command does not *over*-spend your ' +
-      'Bitcoin.  If you want to check the amount before spending, pass the -x flag to see the ' +
+      'Bitcoin.  If you want to check the amount before spending, pass the `-x` flag to see the ' +
       'raw transaction.\n' +
       '\n' +
       'If the command succeeds, it prints out the transaction ID.  You can track its confirmations ' +
@@ -1948,8 +1951,8 @@ export const CLI_ARGS = {
       ],
       minItems: 5,
       maxItems: 6,
-      help: 'Send a particular type of tokens to the given ADDRESS.  Right now, only supported TOKEN-TYPE is "STACKS".  Optionally ' +
-      'include a memo string (MEMO) up to 34 characters long.\n' +
+      help: 'Send a particular type of tokens to the given `ADDRESS`.  Right now, only supported `TOKEN-TYPE` is `STACKS`.  Optionally ' +
+      'include a memo string (`MEMO`) up to 34 characters long.\n' +
       '\n' +
       'If the command succeeds, it prints out a transaction ID.  You can track the confirmations on the transaction ' +
       'via the get_confirmations command.  Once the transaction has 7 confirmations, the Blockstack peer network ' +
@@ -2038,16 +2041,16 @@ export const CLI_ARGS = {
       ],
       minItems: 5,
       maxItems: 5,
-      help: 'Transfer a Blockstack ID to a new address (NEW_ID_ADDRESS).  Optionally preserve ' +
-      'its zone file (KEEP_ZONEFILE).  If the command succeeds, it will print a transaction ID.  ' +
+      help: 'Transfer a Blockstack ID to a new address (`NEW_ID_ADDRESS`).  Optionally preserve ' +
+      'its zone file (`KEEP_ZONEFILE`).  If the command succeeds, it will print a transaction ID.  ' +
       'Once the transaction reaches 7 confirmations, the Blockstack peer network will transfer the ' +
       'Blockstack ID to the new ID-address.  You can track the transaction\'s confirmations with ' +
-      'the "get_confirmations" command.\n' +
+      'the `get_confirmations` command.\n' +
       '\n' +
-      'This command only works for on-chain Blockstack IDs.  It does not yet work for subdomains.\n' +
+      'NOTE: This command only works for on-chain Blockstack IDs.  It does not yet work for subdomains.\n' +
       '\n' +
       'An ID-address can only own up to 25 Blockstack IDs.  In practice, you should generate a new ' +
-      'owner key and ID-address for each name you receive (via the "get_owner_keys" command).\n' +
+      'owner key and ID-address for each name you receive (via the"`get_owner_keys` command).\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -2084,8 +2087,8 @@ export const CLI_ARGS = {
       ],
       minItems: 3,
       maxItems: 3,
-      help: 'Generate and send NAME_PREORDER transaction, for a Blockstack ID to be owned ' +
-      'by a given ID_ADDRESS.  The name cost will be paid for by the gven PAYMENT_KEY.  The ' +
+      help: 'Generate and send `NAME_PREORDER` transaction, for a Blockstack ID to be owned ' +
+      'by a given `ID_ADDRESS`.  The name cost will be paid for by the gven `PAYMENT_KEY`.  The ' +
       'ID-address should be a never-before-seen address, since it will be used as a salt when ' +
       'generating the name preorder hash.\n' +
       '\n' +
@@ -2128,13 +2131,13 @@ export const CLI_ARGS = {
       ],
       minItems: 3,
       maxItems: 5,
-      help: 'Generate and send a NAME_REGISTRATION transaction, assigning the given BLOCKSTACK_ID ' +
-      'to the given ID_ADDRESS.  Optionally pair the Blockstack ID with a zone file (ZONEFILE) or ' +
-      'the hash of the zone file (ZONEFILE_HASH).  You will need to push the zone file to the peer ' +
-      'network after the transaction confirms (i.e. with "zonefile_push").\n' +
+      help: 'Generate and send a NAME_REGISTRATION transaction, assigning the given `BLOCKSTACK_ID` ' +
+      'to the given `ID_ADDRESS`.  Optionally pair the Blockstack ID with a zone file (`ZONEFILE`) or ' +
+      'the hash of the zone file (`ZONEFILE_HASH`).  You will need to push the zone file to the peer ' +
+      'network after the transaction confirms (i.e. with `zonefile_push`).\n' +
       '\n' +
       'This is a low-level command that only experienced Blockstack developers should use.  If you ' +
-      'just want to register a name, you should use the "register" command.',
+      'just want to register a name, you should use the `register` command.',
       group: 'Blockstack ID Management'
     },
     update: {
@@ -2173,17 +2176,17 @@ export const CLI_ARGS = {
       minItems: 4,
       maxItems: 5,
       help: 'Update the zonefile for an on-chain Blockstack ID.  You can generate a well-formed ' +
-      'zone file using the "make_zonefile" command, or you can supply your own.  Zone files can be ' +
+      'zone file using the `make_zonefile` command, or you can supply your own.  Zone files can be ' +
       'up to 40Kb.  Alternatively, if you only want to announce the hash of a zone file (or any ' +
-      'arbitrary 20-byte hex string), you can do so by passing a value for ZONEFILE_HASH.  If ZONEFILE_HASH ' +
-      'is given, then the value for ZONEFILE will be ignored.\n' +
+      'arbitrary 20-byte hex string), you can do so by passing a value for `ZONEFILE_HASH`.  If `ZONEFILE_HASH` ' +
+      'is given, then the value for `ZONEFILE` will be ignored.\n' +
       '\n' +
       'If this command succeeds, it prints out a transaction ID.  Once the transaction has 7 confirmations, ' +
-      'the Blockstack peer network will set the name\'s zone file hash to the RIPEMD160(SHA256) hash of ' +
-      'the given zone file (or it will simply set it to the hash given in ZONEFILE_HASH).\n' +
+      'the Blockstack peer network will set the name\'s zone file hash to the `RIPEMD160`(SHA256) hash of ' +
+      'the given zone file (or it will simply set it to the hash given in `ZONEFILE_HASH`).\n' +
       '\n' +
       'Once the transaction confirms, you will need to replicate the zone file to the Blockstack peer network.  ' +
-      'This can be done with the "zonefile_push" command.  Until you do so, no Blockstack clients will be able ' +
+      'This can be done with the `zonefile_push` command.  Until you do so, no Blockstack clients will be able ' +
       'to obtain the zone file announced by this command.\n' +
       '\n' +
       'Example:\n' +
