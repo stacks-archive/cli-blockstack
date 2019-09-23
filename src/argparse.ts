@@ -1523,10 +1523,10 @@ export const CLI_ARGS = {
       ],
       minItems: 4,
       maxItems: 4,
-      help: 'Store a profile on disk to a Gaia hub.  USER_ID can be either a Blockstack ID or ' +
+      help: 'Store a profile on disk to a Gaia hub.  `USER_ID` can be either a Blockstack ID or ' +
       'an ID-address.  The `GAIA_HUB` argument must be the *write* endpoint for the user\'s Gaia hub ' +
-      '(e.g. https://hub.blockstack.org).  You can verify this by ensuring that you can run \'curl ' +
-      '"$GAIA_HUB/hub_info"\' successfully.',
+      '(e.g. https://hub.blockstack.org).  You can verify this by ensuring that you can run ' +
+      '`curl "$GAIA_HUB/hub_info"` successfully.',
       group: 'Profiles'
     },
     profile_verify: {
@@ -1600,7 +1600,7 @@ export const CLI_ARGS = {
       maxItems: 6,
       help: 'Renew a name.  Optionally transfer it to a new owner address (`NEW_ID_ADDRESS`), ' +
       'and optionally load up and give it a new zone file on disk (`ZONEFILE`).  If the command ' +
-      'succeeds, it prints out a transaction ID.  You can use with the "get_confirmations" ' +
+      'succeeds, it prints out a transaction ID.  You can use with the `get_confirmations` ' +
       'command to track its confirmations on the underlying blockchain -- once it reaches 7 ' +
       'confirmations, the rest of the Blockstack peer network will process it.\n' +
       '\n' +
@@ -1692,7 +1692,7 @@ export const CLI_ARGS = {
       'you can specify a path to it on disk with the `ZONEFILE` argument.\n' +
       '\n' +
       'If this command completes successfully, your name will be ready to use once both transactions have 7+ confirmations.  ' +
-      'You can use the "get_confirmations" command to track the confirmations ' +
+      'You can use the `get_confirmations` command to track the confirmations ' +
       'on the transaction IDs returned by this command.\n' +
       '\n' +
       'WARNING: You should *NOT* use the payment private key (`PAYMENT_KEY`) while the name is being confirmed.  ' +
@@ -1764,7 +1764,7 @@ export const CLI_ARGS = {
       '\n' +
       'If this command completes successfully, the name will be ready to use in a couple of ' +
       'hours---that is, once both transactions have 7+ confirmations. ' +
-      'You can use the "get_confirmations" command to track the confirmations.\n' +
+      'You can use the `get_confirmations` command to track the confirmations.\n' +
       '\n' +
       'WARNING: You should *NOT* use the payment private key (`PAYMENT_KEY`) while the name is being confirmed.  ' +
       'If you do so, you could double-spend one of the pending transactions and lose the name.\n' +
@@ -1899,7 +1899,7 @@ export const CLI_ARGS = {
       'raw transaction.\n' +
       '\n' +
       'If the command succeeds, it prints out the transaction ID.  You can track its confirmations ' +
-      'with the get_confirmations command.\n' +
+      'with the `get_confirmations` command.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -1955,7 +1955,7 @@ export const CLI_ARGS = {
       'include a memo string (`MEMO`) up to 34 characters long.\n' +
       '\n' +
       'If the command succeeds, it prints out a transaction ID.  You can track the confirmations on the transaction ' +
-      'via the get_confirmations command.  Once the transaction has 7 confirmations, the Blockstack peer network ' +
+      'via the `get_confirmations` command.  Once the transaction has 7 confirmations, the Blockstack peer network ' +
       'will have processed it, and your payment key balance and recipient balance will be updated.\n' +
       '\n' +
       'At this time, token transfers are encoded as Bitcoin transactions.  As such, you will need to pay a transaction ' +
