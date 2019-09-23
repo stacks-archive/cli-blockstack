@@ -3411,7 +3411,7 @@ export function CLIMain() {
   const cmdArgs : any = checkArgs(CLIOptAsStringArray(opts, '_') ? CLIOptAsStringArray(opts, '_') : []);
   if (!cmdArgs.success) {
     if (cmdArgs.error) {
-       console.log(cmdArgs.error);
+      console.log(cmdArgs.error);
     }
     if (cmdArgs.usage) {
       if (cmdArgs.command) {

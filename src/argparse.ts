@@ -2050,7 +2050,7 @@ export const CLI_ARGS = {
       'NOTE: This command only works for on-chain Blockstack IDs.  It does not yet work for subdomains.\n' +
       '\n' +
       'An ID-address can only own up to 25 Blockstack IDs.  In practice, you should generate a new ' +
-      'owner key and ID-address for each name you receive (via the"`get_owner_keys` command).\n' +
+      'owner key and ID-address for each name you receive (via the `get_owner_keys` command).\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -2264,7 +2264,7 @@ export const CLI_ARGS = {
       maxItems: 1,
       help: 'Push a zone file on disk to the Blockstack peer network.  The zone file must ' +
       'correspond to a zone file hash that has already been announced.  That is, you use this command ' +
-      'in conjunction with the "register", "update", "renew", or "name_import" commands.\n' +
+      'in conjunction with the `register`, `update`, `renew`, or `name_import` commands.\n' +
       '\n' +
       'Example:\n' +
       '\n' +
@@ -2879,10 +2879,10 @@ export function checkArgs(argList: Array<string>)
   const ajv = Ajv();
   const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
-    let errorMsg = "";
+    let errorMsg = '';
     for (let i = 0; i < ajv.errors.length; i++) {
-       const msg = `Invalid command arguments: Schema "${ajv.errors[0].schemaPath}" failed validation (problem: "${ajv.errors[0].message}", cause: "${JSON.stringify(ajv.errors[0].params)}")\n`;
-       errorMsg += msg;
+      const msg = `Invalid command arguments: Schema "${ajv.errors[0].schemaPath}" failed validation (problem: "${ajv.errors[0].message}", cause: "${JSON.stringify(ajv.errors[0].params)}")\n`;
+      errorMsg += msg;
     }
     return {
       'success': false,
