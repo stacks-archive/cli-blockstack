@@ -102,7 +102,7 @@ export async function getOwnerKeyInfo(network: CLINetworkAdapter,
 export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<PaymentKeyInfoType> {
   const wallet = await walletFromMnemonic(mnemonic);
   const privkey = wallet.getBitcoinPrivateKey(0);
-  const addr = getPrivateKeyAddress(network, privkey);
+  const addr = await getPrivateKeyAddress(network, privkey);
   const result: PaymentKeyInfoType = {
     privateKey: privkey,
     address: {
@@ -179,8 +179,8 @@ export async function getApplicationKeyInfo(network: CLINetworkAdapter,
 
   //const appPrivateKey = blockstack.BlockstackWallet.getAppPrivateKey(
   //  appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
-  const legacyAppPrivateKey = blockstack.BlockstackWallet.getLegacyAppPrivateKey(
-    appsNode.toBase58(), wallet.getIdentitySalt(), appDomain);
+  const legacyAppPrivateKey = await blockstack.BlockstackWallet.getLegacyAppPrivateKey(
+    appsNode.toBase58(), await wallet.getIdentitySalt(), appDomain);
 
   // TODO: figure out when we can start using the new derivation path
   const res : AppKeyInfoType = {
@@ -190,7 +190,7 @@ export async function getApplicationKeyInfo(network: CLINetworkAdapter,
     },
     legacyKeyInfo: {
       privateKey: legacyAppPrivateKey,
-      address: getPrivateKeyAddress(network, `${legacyAppPrivateKey}01`)
+      address: await getPrivateKeyAddress(network, `${legacyAppPrivateKey}01`)
     },
     ownerKeyIndex: idIndex
   };

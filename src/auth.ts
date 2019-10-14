@@ -138,7 +138,7 @@ async function makeSignInLink(network: CLINetworkAdapter,
   const appPrivateKey = await getAppPrivateKey(network, mnemonic, id, appOrigin);
 
   const associationToken = makeAssociationToken(appPrivateKey, id.privateKey);
-  const authResponseTmp = blockstack.makeAuthResponse(
+  const authResponseTmp = await blockstack.makeAuthResponse(
     id.privateKey,
     {},
     id.name,

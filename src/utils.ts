@@ -55,8 +55,8 @@ class CLITransactionSigner implements TransactionSigner {
     return Promise.resolve().then(() => this.address);
   }
 
-  signTransaction(_txIn: bitcoinjs.TransactionBuilder, _signingIndex: number) : Promise<void> {
-    return Promise.resolve().then(() => {});
+  async signTransaction(_txIn: bitcoinjs.TransactionBuilder, _signingIndex: number) : Promise<void> {
+    return Promise.resolve();
   }
 
   signerVersion() : number { return 0; }
@@ -382,7 +382,7 @@ export function getPublicKeyFromPrivateKey(privateKey: string) : string {
  * Get a private key's address.  Honor the 01 to compress the public key
  * @privateKey (string) the hex-encoded private key
  */
-export function getPrivateKeyAddress(network: CLINetworkAdapter, privateKey: string | CLITransactionSigner) : string {
+export async function getPrivateKeyAddress(network: CLINetworkAdapter, privateKey: string | CLITransactionSigner) : Promise<string> {
   if (isCLITransactionSigner(privateKey)) {
     const pkts = privateKey as CLITransactionSigner;
     return pkts.address;
@@ -390,7 +390,7 @@ export function getPrivateKeyAddress(network: CLINetworkAdapter, privateKey: str
   else {
     const pk = privateKey as string;
     const ecKeyPair = blockstack.hexStringToECPair(pk);
-    return network.coerceAddress(blockstack.ecPairToAddress(ecKeyPair));
+    return network.coerceAddress(await blockstack.ecPairToAddress(ecKeyPair));
   }
 }
 
@@ -449,7 +449,7 @@ export function checkUrl(url: string) : string {
  */
 export function makeProfileJWT(profileData: Object, privateKey: string) : string {
   const signedToken = blockstack.signProfileToken(profileData, privateKey);
-  const wrappedToken = blockstack.wrapProfileToken(signedToken);
+  const wrappedToken: {token: string; decodedToken: {}} = blockstack.wrapProfileToken(signedToken);
   const tokenRecords = [wrappedToken];
   return JSONStringify(tokenRecords);
 }
@@ -462,42 +462,33 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
 export async function broadcastTransactionAndZoneFile(network: CLINetworkAdapter,
   tx: string,
   zonefile?: string) {
-  let txid : string;
-  return Promise.resolve().then(() => {
-    return network.broadcastTransaction(tx);
-  })
-    .then((_txid : string) => {
-      txid = _txid;
-      if (zonefile) {
-        return network.broadcastZoneFile(zonefile, txid);
-      }
-      else {
-        return { 'status': true };
-      }
-    })
-    .then((resp) => {
-      if (!resp.status) {
-        return {
-          'status': false,
-          'error': 'Failed to broadcast zone file',
-          'txid': txid
-        };
-      }
-      else {
-        return {
-          'status': true,
-          'txid': txid
-        };
-      }
-    })
-    .catch((e) => {
+  try {
+    const txid: string = await network.broadcastTransaction(tx);
+    let resp = { 'status': true };
+    if (zonefile) {
+      resp = await network.broadcastZoneFile(zonefile, txid);
+    }
+    if (!resp.status) {
       return {
         'status': false,
-        'error': 'Caught exception sending transaction or zone file',
-        'message': e.message,
-        'stacktrace': e.stack
+        'error': 'Failed to broadcast zone file',
+        'txid': txid
       };
-    });
+    }
+    else {
+      return {
+        'status': true,
+        'txid': txid
+      };
+    }
+  } catch(e) {
+    return {
+      'status': false,
+      'error': 'Caught exception sending transaction or zone file',
+      'message': e.message,
+      'stacktrace': e.stack
+    };
+  }
 }
 
 
