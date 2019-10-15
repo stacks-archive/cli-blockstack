@@ -2813,14 +2813,16 @@ export function getCommandArgs(command: string, argsList: Array<string>) {
 export interface CheckArgsSuccessType {
   success: true;
   command: string;
-  args: Array<string>
+  args: Array<string>;
+  error?: false;
+  usage?: false;
 };
 
 export interface CheckArgsFailType {
   success: false;
   error: string;
   command: string;
-  usage: boolean
+  usage: boolean;
 };
 
 export function checkArgs(argList: Array<string>) 
@@ -2876,10 +2878,10 @@ export function checkArgs(argList: Array<string>)
   const ajv = Ajv();
   const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
-    let errorMsg = "";
+    let errorMsg = '';
     for (let i = 0; i < ajv.errors.length; i++) {
-       const msg = `Invalid command arguments: Schema "${ajv.errors[0].schemaPath}" failed validation (problem: "${ajv.errors[0].message}", cause: "${JSON.stringify(ajv.errors[0].params)}")\n`;
-       errorMsg += msg;
+      const msg = `Invalid command arguments: Schema "${ajv.errors[0].schemaPath}" failed validation (problem: "${ajv.errors[0].message}", cause: "${JSON.stringify(ajv.errors[0].params)}")\n`;
+      errorMsg += msg;
     }
     return {
       'success': false,
