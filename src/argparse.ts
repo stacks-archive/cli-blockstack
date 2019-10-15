@@ -2876,10 +2876,14 @@ export function checkArgs(argList: Array<string>)
   const ajv = Ajv();
   const valid = ajv.validate(commandSchema, commandArgs);
   if (!valid) {
-    // console.error(ajv.errors);
+    let errorMsg = "";
+    for (let i = 0; i < ajv.errors.length; i++) {
+       const msg = `Invalid command arguments: Schema "${ajv.errors[0].schemaPath}" failed validation (problem: "${ajv.errors[0].message}", cause: "${JSON.stringify(ajv.errors[0].params)}")\n`;
+       errorMsg += msg;
+    }
     return {
       'success': false,
-      'error': 'Invalid command arguments',
+      'error': errorMsg,
       'usage': true,
       'command': commandName
     };
