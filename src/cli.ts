@@ -360,11 +360,11 @@ function getZonefile(network: CLINetworkAdapter, args: string[]) : Promise<strin
  * @paymentKey (string) the payment private key
  * @preorderTxOnly (boolean) OPTIONAL: used internally to only return a tx (overrides CLI)
  */
-function txPreorder(network: CLINetworkAdapter, args: string[], preorderTxOnly: boolean = false) : Promise<string> {
+async function txPreorder(network: CLINetworkAdapter, args: string[], preorderTxOnly: boolean = false) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const paymentKey = decodePrivateKey(args[2]);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
 
   if (!IDaddress.startsWith('ID-')) {
     throw new Error('Recipient ID-address must start with ID-');
@@ -496,7 +496,7 @@ function txPreorder(network: CLINetworkAdapter, args: string[], preorderTxOnly: 
  *  (in which case, @zonefile will be ignored)
  * @registerTxOnly (boolean) OPTIONAL: used internally to coerce returning only the tx
  */
-function txRegister(network: CLINetworkAdapter, args: string[], registerTxOnly: boolean = false) : Promise<string> {
+async function txRegister(network: CLINetworkAdapter, args: string[], registerTxOnly: boolean = false) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const paymentKey = decodePrivateKey(args[2]);
@@ -532,7 +532,7 @@ function txRegister(network: CLINetworkAdapter, args: string[], registerTxOnly: 
     }
   }
 
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
   const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
@@ -704,7 +704,7 @@ function makeZonefile(network: CLINetworkAdapter, args: string[]) : Promise<stri
  * @zonefileHash (string) the zone file hash to use, if given
  *   (will be used instead of the zonefile)
  */
-function update(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function update(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   let zonefilePath = args[1];
   const ownerKey = decodePrivateKey(args[2]);
@@ -723,8 +723,8 @@ function update(network: CLINetworkAdapter, args: string[]) : Promise<string> {
     zonefile = fs.readFileSync(zonefilePath).toString();
   }
 
-  const ownerAddress = getPrivateKeyAddress(network, ownerKey);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const ownerAddress = await getPrivateKeyAddress(network, ownerKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
 
   const ownerUTXOsPromise = network.getUTXOs(ownerAddress);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
@@ -816,14 +816,14 @@ function update(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * @ownerKey (string) the owner private key
  * @paymentKey (string) the payment private key
  */
-function transfer(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function transfer(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const IDaddress = args[1];
   const keepZoneFile = (args[2].toLowerCase() === 'true');
   const ownerKey = decodePrivateKey(args[3]);
   const paymentKey = decodePrivateKey(args[4]);
-  const ownerAddress = getPrivateKeyAddress(network, ownerKey);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const ownerAddress = await getPrivateKeyAddress(network, ownerKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
 
   if (!IDaddress.startsWith('ID-')) {
     throw new Error('Recipient ID-address must start with ID-');
@@ -961,8 +961,8 @@ async function renew(network: CLINetworkAdapter, args: string[]) : Promise<strin
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const paymentKey = decodePrivateKey(args[2]);
-  const ownerAddress = getPrivateKeyAddress(network, ownerKey);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const ownerAddress = await getPrivateKeyAddress(network, ownerKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
   const namespaceID = name.split('.').slice(-1)[0];
 
   let newAddress  = '';
@@ -976,7 +976,7 @@ async function renew(network: CLINetworkAdapter, args: string[]) : Promise<strin
     newAddress = args[3].slice(3);
   }
   else {
-    newAddress = getPrivateKeyAddress(network, ownerKey);
+    newAddress = await getPrivateKeyAddress(network, ownerKey);
   }
 
   if (args.length >= 5 && !!args[4]) {
@@ -1119,12 +1119,12 @@ async function renew(network: CLINetworkAdapter, args: string[]) : Promise<strin
  * @ownerKey (string) the owner private key
  * @paymentKey (string) the payment private key
  */
-function revoke(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function revoke(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const paymentKey = decodePrivateKey(args[2]);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
-  const ownerAddress = getPrivateKeyAddress(network, ownerKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
+  const ownerAddress = await getPrivateKeyAddress(network, ownerKey);
 
   const ownerUTXOsPromise = network.getUTXOs(ownerAddress);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
@@ -1214,11 +1214,11 @@ function revoke(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * @address (string) the address to reveal the namespace
  * @paymentKey (string) the payment private key
  */
-function namespacePreorder(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function namespacePreorder(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const address = args[1];
   const paymentKey = decodePrivateKey(args[2]);
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
 
   const txPromise = blockstack.transactions.makeNamespacePreorder(
     namespaceID, address, paymentKey, !hasKeys(paymentKey));
@@ -1288,7 +1288,7 @@ function namespacePreorder(network: CLINetworkAdapter, args: string[]) : Promise
   return safetyChecksPromise
     .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult)));
+        return JSONStringify(safetyChecksResult);
       }
 
       if (txOnly) {
@@ -1318,7 +1318,7 @@ function namespacePreorder(network: CLINetworkAdapter, args: string[]) : Promise
  * @noVowelDiscount (int) the no-vowel price discount
  * @paymentKey (string) the payment private key
  */
-function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const revealAddr = args[1];
   const version = parseInt(args[2]);
@@ -1355,7 +1355,7 @@ function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<s
   namespace.setNonalphaDiscount(nonalphaDiscount);
   namespace.setNoVowelDiscount(noVowelDiscount);
 
-  const paymentAddress = getPrivateKeyAddress(network, paymentKey);
+  const paymentAddress = await getPrivateKeyAddress(network, paymentKey);
   const paymentUTXOsPromise = network.getUTXOs(paymentAddress);
 
   const estimatePromise = paymentUTXOsPromise.then((utxos : UTXO[]) => {
@@ -1417,7 +1417,7 @@ function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<s
   return safetyChecksPromise
     .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
+        return JSONStringify(safetyChecksResult, true);
       }
 
       if (txOnly) {
@@ -1439,10 +1439,10 @@ function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Promise<s
  * @namespaceID (string) the namespace ID
  * @revealKey (string) the hex-encoded reveal key
  */
-function namespaceReady(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function namespaceReady(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const namespaceID = args[0];
   const revealKey = decodePrivateKey(args[1]);
-  const revealAddress = getPrivateKeyAddress(network, revealKey);
+  const revealAddress = await getPrivateKeyAddress(network, revealKey);
 
   const txPromise = blockstack.transactions.makeNamespaceReady(
     namespaceID, revealKey, !hasKeys(revealKey));
@@ -1531,7 +1531,7 @@ function namespaceReady(network: CLINetworkAdapter, args: string[]) : Promise<st
  * @zonefile (string) OPTIONAL: the path to the zone file to use (supercedes gaiaHubUrl)
  * @zonefileHash (string) OPTIONAL: the hash of the zone file (supercedes gaiaHubUrl and zonefile)
  */
-function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const IDrecipientAddr = args[1];
   const gaiaHubUrl = args[2];
@@ -1563,14 +1563,14 @@ function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string
       checkUrl(profileUrl);
     }
     catch(e) {
-      return Promise.resolve().then(() => JSONStringify({
+      return JSONStringify({
         'status': false,
         'error': e.message,
         'hints': [
           'Make sure the Gaia hub URL does not have any trailing /\'s',
           'Make sure the Gaia hub URL scheme is present and well-formed'
         ]
-      }, true));
+      }, true);
     }
 
     zonefile = blockstack.makeProfileZoneFile(name, profileUrl);
@@ -1578,7 +1578,7 @@ function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string
   }
 
   const namespaceID = name.split('.').slice(-1)[0];
-  const importAddress = getPrivateKeyAddress(network, importKey);
+  const importAddress = await getPrivateKeyAddress(network, importKey);
 
   const txPromise = blockstack.transactions.makeNameImport(
     name, recipientAddr, zonefileHash, importKey, !hasKeys(importKey));
@@ -1651,7 +1651,7 @@ function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string
   return safetyChecksPromise
     .then((safetyChecksResult : any) => {
       if (!safetyChecksResult.status) {
-        return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
+        return JSONStringify(safetyChecksResult, true);
       }
 
       if (txOnly) {
@@ -1681,11 +1681,11 @@ function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<string
  * @messageHash (string) the hash of the already-sent message
  * @senderKey (string) the key that owns the name that the peers have subscribed to
  */
-function announce(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function announce(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const messageHash = args[0];
   const senderKey = decodePrivateKey(args[1]);
 
-  const senderAddress = getPrivateKeyAddress(network, senderKey);
+  const senderAddress = await getPrivateKeyAddress(network, senderKey);
 
   const txPromise = blockstack.transactions.makeAnnounce(
     messageHash, senderKey, !hasKeys(senderKey));
@@ -1766,13 +1766,13 @@ function announce(network: CLINetworkAdapter, args: string[]) : Promise<string> 
  * @arg zonefile (string) OPTIONAL the path to the zone file to give this name.
  *  supercedes gaiaHubUrl
  */
-function register(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function register(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = args[1];
   const paymentKey = decodePrivateKey(args[2]);
   const gaiaHubUrl = args[3];
 
-  const address = getPrivateKeyAddress(network, ownerKey);
+  const address = await getPrivateKeyAddress(network, ownerKey);
   const emptyProfile : any = {type: '@Person', account: []};
 
   let zonefilePromise : Promise<string>;
@@ -2021,13 +2021,13 @@ function registerAddr(network: CLINetworkAdapter, args: string[]) : Promise<stri
  * @arg zonefile (string) OPTIONAL the path to the zone file to give this name.
  *  supercedes gaiaHubUrl
  */
-function registerSubdomain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function registerSubdomain(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const name = args[0];
   const ownerKey = decodePrivateKey(args[1]);
   const gaiaHubUrl = args[2];
   const registrarUrl = args[3];
 
-  const address = getPrivateKeyAddress(network, ownerKey);
+  const address = await getPrivateKeyAddress(network, ownerKey);
   const mainnetAddress = network.coerceMainnetAddress(address);
   const emptyProfile : any = {type: '@Person', account: []};
   const onChainName = name.split('.').slice(-2).join('.');
@@ -2168,7 +2168,7 @@ function profileSign(network: CLINetworkAdapter, args: string[]) : Promise<strin
  * @path (string) path to the profile
  * @publicKeyOrAddress (string) public key or address
  */
-function profileVerify(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function profileVerify(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const profilePath = args[0];
   let publicKeyOrAddress = args[1];
 
@@ -2179,25 +2179,23 @@ function profileVerify(network: CLINetworkAdapter, args: string[]) : Promise<str
   
   const profileString = fs.readFileSync(profilePath).toString();
   
-  return Promise.resolve().then(() => {
-    let profileToken = null;
-    
-    try {
-      const profileTokens = JSON.parse(profileString);
-      profileToken = profileTokens[0].token;
-    }
-    catch (e) {
-      // might be a raw token 
-      profileToken = profileString;
-    }
+  let profileToken = null;
+  
+  try {
+    const profileTokens = JSON.parse(profileString);
+    profileToken = profileTokens[0].token;
+  }
+  catch (e) {
+    // might be a raw token 
+    profileToken = profileString;
+  }
 
-    if (!profileToken) {
-      throw new Error(`Data at ${profilePath} does not appear to be a signed profile`);
-    }
-   
-    const profile = blockstack.extractProfile(profileToken, publicKeyOrAddress);
-    return JSONStringify(profile);
-  });
+  if (!profileToken) {
+    throw new Error(`Data at ${profilePath} does not appear to be a signed profile`);
+  }
+  
+  const profile = await blockstack.extractProfile(profileToken, publicKeyOrAddress);
+  return JSONStringify(profile);
 }
 
 
@@ -2213,7 +2211,7 @@ function profileVerify(network: CLINetworkAdapter, args: string[]) : Promise<str
  * @privateKey (string) owner private key for the name
  * @gaiaUrl (string) this is the write endpoint of the Gaia hub to use
  */
-function profileStore(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function profileStore(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const nameOrAddress = args[0];
   const signedProfilePath = args[1];
   const privateKey = decodePrivateKey(args[2]);
@@ -2221,7 +2219,7 @@ function profileStore(network: CLINetworkAdapter, args: string[]) : Promise<stri
 
   const signedProfileData = fs.readFileSync(signedProfilePath).toString();
 
-  const ownerAddress = getPrivateKeyAddress(network, privateKey);
+  const ownerAddress = await getPrivateKeyAddress(network, privateKey);
   const ownerAddressMainnet = network.coerceMainnetAddress(ownerAddress);
 
   let nameInfoPromise : Promise<{address: string}>;
@@ -2558,7 +2556,7 @@ function sendBTC(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * @privateKeyBTC (string) the hex-encoded private key to use to fund the BTC fee
  * @memo (string) OPTIONAL: a 34-byte memo to include
  */
-function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const recipientAddress = c32check.c32ToB58(args[0]);
   const tokenType = args[1];
   const tokenAmount = new BN(args[2]);
@@ -2570,7 +2568,7 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
     memo = args[5];
   }
 
-  const senderAddress = getPrivateKeyAddress(network, privateKey);
+  const senderAddress = await getPrivateKeyAddress(network, privateKey);
   const senderUTXOsPromise = network.getUTXOs(senderAddress);
 
   const txPromise = blockstack.transactions.makeTokenTransfer(
@@ -2679,14 +2677,12 @@ function getConfirmations(network: CLINetworkAdapter, args: string[]) : Promise<
  * args:
  * @private_key (string) the hex-encoded private key or key bundle
  */
-function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const privateKey = decodePrivateKey(args[0]);
-  return Promise.resolve().then(() => {
-    const addr = getPrivateKeyAddress(network, privateKey);
-    return JSONStringify({
-      'BTC': addr,
-      'STACKS': c32check.b58ToC32(addr)
-    });
+  const addr = await getPrivateKeyAddress(network, privateKey);
+  return JSONStringify({
+    'BTC': addr,
+    'STACKS': c32check.b58ToC32(addr)
   });
 }
 
@@ -3055,7 +3051,7 @@ async function gaiaSetHub(network: CLINetworkAdapter, args: string[]) : Promise<
   }
   
   appPrivateKey = `${canonicalPrivateKey(appPrivateKey)}01`;
-  const appAddress = network.coerceMainnetAddress(getPrivateKeyAddress(network, appPrivateKey));
+  const appAddress = network.coerceMainnetAddress(await getPrivateKeyAddress(network, appPrivateKey));
 
   if (existingAppAddress && appAddress !== existingAppAddress) {
     throw new Error(`BUG: ${existingAppAddress} !== ${appAddress}`);
@@ -3408,10 +3404,10 @@ export function CLIMain() {
   const argv = process.argv;
   const opts = getCLIOpts(argv);
 
-  const cmdArgs : any = checkArgs(CLIOptAsStringArray(opts, '_') ? CLIOptAsStringArray(opts, '_') : []);
+  const cmdArgs = checkArgs(CLIOptAsStringArray(opts, '_') ? CLIOptAsStringArray(opts, '_') : []);
   if (!cmdArgs.success) {
     if (cmdArgs.error) {
-       console.log(cmdArgs.error);
+      console.log(cmdArgs.error);
     }
     if (cmdArgs.usage) {
       if (cmdArgs.command) {

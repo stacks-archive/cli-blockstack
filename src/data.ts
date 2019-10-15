@@ -85,7 +85,7 @@ export function makeAssociationToken(appPrivateKey: string, identityKey: string)
  * Process a (fake) session token and set up a Gaia hub connection.
  * Returns a Promise that resolves to the (fake) userData
  */
-export function gaiaAuth(network: CLINetworkAdapter,
+export async function gaiaAuth(network: CLINetworkAdapter,
   appPrivateKey: string | null,
   hubUrl: string | null,
   ownerPrivateKey?: string) : Promise<UserData> {
@@ -99,7 +99,7 @@ export function gaiaAuth(network: CLINetworkAdapter,
     associationToken = makeAssociationToken(appPrivateKey, ownerPrivateKey);
   }
 
-  const authSessionToken = makeFakeAuthResponseToken(appPrivateKey, hubUrl, associationToken);
+  const authSessionToken = await makeFakeAuthResponseToken(appPrivateKey, hubUrl, associationToken);
   const nameLookupUrl = `${network.blockstackAPIUrl}/v1/names/`;
   const transitPrivateKey = 'f33fb466154023aba2003c17158985aa6603db68db0f1afc0fcf1d641ea6c2cb';     // same as above
   return blockstack.handlePendingSignIn(nameLookupUrl, authSessionToken, transitPrivateKey);
@@ -112,15 +112,15 @@ export function gaiaAuth(network: CLINetworkAdapter,
  * Make sure we use a mainnet address always, even in test mode.
  * Returns a Promise that resolves to a GaiaHubConfig
  */
-export function gaiaConnect(network: CLINetworkAdapter,
+export async function gaiaConnect(network: CLINetworkAdapter,
   gaiaHubUrl: string, 
   privateKey: string,
   ownerPrivateKey?: string
 ) {
   const addressMainnet = network.coerceMainnetAddress(
-    getPrivateKeyAddress(network, `${canonicalPrivateKey(privateKey)}01`));
+    await getPrivateKeyAddress(network, `${canonicalPrivateKey(privateKey)}01`));
   const addressMainnetCanonical = network.coerceMainnetAddress(
-    getPrivateKeyAddress(network, canonicalPrivateKey(privateKey)));
+    await getPrivateKeyAddress(network, canonicalPrivateKey(privateKey)));
 
   let associationToken;
   if (ownerPrivateKey) {
@@ -283,10 +283,10 @@ export function gaiaUploadProfileAll(network: CLINetworkAdapter,
  *
  * Returns a promise that resolves to the zone file with the profile URL
  */
-export function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string, 
-  gaiaHubUrl: string, ownerKey: string) {
+export async function makeZoneFileFromGaiaUrl(network: CLINetworkAdapter, name: string, 
+  gaiaHubUrl: string, ownerKey: string): Promise<string> {
 
-  const address = getPrivateKeyAddress(network, ownerKey);
+  const address = await getPrivateKeyAddress(network, ownerKey);
   const mainnetAddress = network.coerceMainnetAddress(address);
 
   return gaiaConnect(network, gaiaHubUrl, ownerKey)
