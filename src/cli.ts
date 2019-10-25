@@ -2034,11 +2034,7 @@ function registerSubdomain(network: CLINetworkAdapter, args: string[]) : Promise
   const subName = name.split('.')[0];
 
   let zonefilePromise : Promise<string>;
-
-  // TODO: fix this once the subdomain registrar will tell us the on-chain name
-  logger.warn(`WARNING: not yet able to verify that ${registrarUrl} is the registrar ` +
-              `for ${onChainName}; assuming that it is...`);
-
+   
   if (args.length > 4 && !!args[4]) {
     const zonefilePath = args[4];
     zonefilePromise = Promise.resolve().then(() => fs.readFileSync(zonefilePath).toString());
@@ -2602,17 +2598,21 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
     return sumUTXOs(utxos);
   });
 
+  const receiverIsDistinctPromise = Promise.resolve().then(() => {
+     return recipientAddress != senderAddress
+  });
+
   const accountStatePromise = network.getAccountStatus(senderAddress, tokenType);
   const tokenBalancePromise = network.getAccountBalance(senderAddress, tokenType);
   const blockHeightPromise = network.getBlockHeight();
 
   const safetyChecksPromise = Promise.all(
     [tokenBalancePromise, estimatePromise, btcBalancePromise,
-      accountStatePromise, blockHeightPromise])
+      accountStatePromise, blockHeightPromise, receiverIsDistinctPromise])
     .then(([tokenBalance, estimate, btcBalance, 
-      accountState, blockHeight]) => {
+      accountState, blockHeight, receiverIsDistinct]) => {
       if (btcBalance >= estimate && tokenBalance.cmp(tokenAmount) >= 0 &&
-          accountState.lock_transfer_block_id <= blockHeight) {
+          accountState.lock_transfer_block_id <= blockHeight && receiverIsDistinct) {
         return {'status': true};
       }
       else {
@@ -2623,7 +2623,8 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
           'senderBalanceBTC': btcBalance,
           'estimateCostBTC': estimate,
           'tokenBalance': tokenBalance.toString(),
-          'blockHeight': blockHeight
+          'blockHeight': blockHeight,
+          'receiverIsDistinctFromSender': receiverIsDistinct
         };
       }
     });
