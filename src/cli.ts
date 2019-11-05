@@ -116,7 +116,7 @@ export function getMaxIDSearchIndex() {
   return maxIDSearchIndex;
 }
 
-export interface WhoisInfoType {
+export type WhoisInfoType = {
   address: string;
   blockchain: string;
   block_renewed_at: number;
@@ -132,7 +132,7 @@ export interface WhoisInfoType {
   status: string;
   zonefile: string | null;
   zonefile_hash: string | null;
-}
+};
 
 /*
  * Get a name's record information
@@ -150,7 +150,7 @@ function whois(network: CLINetworkAdapter, args: string[]) : Promise<string> {
         return Promise.all([network.getNameHistory(name, 0), network.getBlockHeight()])
           .then(([nameHistory, blockHeight] : [any, number]) => {
             if (nameInfo.renewal_deadline > 0 && nameInfo.renewal_deadline <= blockHeight) {
-              return {'error': 'Name expired'};
+              return JSONStringify({'error': 'Name expired'}, true);
             }
 
             const blocks : string[] = Object.keys(nameHistory);
@@ -176,9 +176,8 @@ function whois(network: CLINetworkAdapter, args: string[]) : Promise<string> {
               zonefile: nameInfo.zonefile,
               zonefile_hash: nameInfo.zonefile_hash
             };
-            return whois;
-          })
-          .then((whoisInfo : any) => JSONStringify(whoisInfo, true));
+            return JSONStringify(whois, true);
+          });
       }
       else {
         return Promise.resolve().then(() => JSONStringify(nameInfo, true));
@@ -308,14 +307,14 @@ function getNameHistoryRecord(network: CLINetworkAdapter, args: string[]) : Prom
     return Promise.resolve().then(() => {
       return network.getNameHistory(name, page);
     })
-      .then((nameHistory : any) => {
+      .then((nameHistory) => {
         return JSONStringify(nameHistory);
       });
   }
   else {
     // all pages 
     return getAllNameHistoryPages(network, name, 0)
-      .then((history : any) => JSONStringify(history));
+      .then((history) => JSONStringify(history));
   }
 }
 
@@ -1286,7 +1285,7 @@ async function namespacePreorder(network: CLINetworkAdapter, args: string[]) : P
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult : any) => {
+    .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
         return JSONStringify(safetyChecksResult);
       }
@@ -1415,7 +1414,7 @@ async function namespaceReveal(network: CLINetworkAdapter, args: string[]) : Pro
     });
   
   return safetyChecksPromise
-    .then((safetyChecksResult : any) => {
+    .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
         return JSONStringify(safetyChecksResult, true);
       }
@@ -1503,7 +1502,7 @@ async function namespaceReady(network: CLINetworkAdapter, args: string[]) : Prom
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult : any) => {
+    .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
         return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
@@ -1605,7 +1604,7 @@ async function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<
         .then((tx : string) => {
           return broadcastTransactionAndZoneFile(network, tx, zonefile);
         })
-        .then((resp : any) => {
+        .then((resp) => {
           if (resp.status && resp.hasOwnProperty('txid')) {
             // just return txid 
             return resp.txid;
@@ -1649,7 +1648,7 @@ async function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult : any) => {
+    .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
         return JSONStringify(safetyChecksResult, true);
       }
@@ -1662,7 +1661,7 @@ async function nameImport(network: CLINetworkAdapter, args: string[]) : Promise<
         .then((tx : string) => {
           return broadcastTransactionAndZoneFile(network, tx, zonefile);
         })
-        .then((resp : any) => {
+        .then((resp) => {
           if (resp.status && resp.hasOwnProperty('txid')) {
             // just return txid 
             return resp.txid;
@@ -1735,7 +1734,7 @@ async function announce(network: CLINetworkAdapter, args: string[]) : Promise<st
     });
 
   return safetyChecksPromise
-    .then((safetyChecksResult : any) => {
+    .then((safetyChecksResult) => {
       if (!safetyChecksResult.status) {
         return new Promise((resolve : any) => resolve(JSONStringify(safetyChecksResult, true)));
       }
@@ -2132,7 +2131,7 @@ async function registerSubdomain(network: CLINetworkAdapter, args: string[]) : P
           .then(resp => resp.json());
 
         return Promise.all([registerPromise, profileUploadPromise])
-          .then(([registerInfo, profileUploadInfo] : [any, any]) => {
+          .then(([registerInfo, profileUploadInfo]) => {
             if (!profileUploadInfo.error) {
               return JSONStringify({
                 'txInfo': registerInfo,
@@ -3131,12 +3130,12 @@ function addressConvert(network: CLINetworkAdapter, args: string[]) : Promise<st
   }
 
   return Promise.resolve().then(() => {
-    const result : any = {
+    const result = {
       mainnet: {
         STACKS: c32addr, 
         BTC: b58addr
       },
-      testnet: undefined
+      testnet: undefined as { STACKS: string; BTC: string }
     };
 
     if (network.isTestnet()) {
