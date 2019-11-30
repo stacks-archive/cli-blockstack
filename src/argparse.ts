@@ -2271,6 +2271,33 @@ export const CLI_ARGS = {
       '    ]\n' +
       '\n',
       group: 'Peer Services'
+    },
+    get_did_configuration: {
+      type: 'array',
+      items: [
+        {
+          name: 'blockstack_id',
+          type: 'string',
+          realtype: 'blockstack_id',
+          pattern: NAME_PATTERN + '|'+ SUBDOMAIN_PATTERN
+        },
+        {
+          name: 'domain',
+          type: 'string',
+          realtype: 'domain',
+          pattern: NAME_PATTERN + '|'+ SUBDOMAIN_PATTERN
+        },
+        {
+          name: 'owner_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+        },
+      ],
+      minItems: 3,
+      maxItems: 3,
+      help: 'Creates a DID configuration for the given blockstack id and domain',
+      group: 'DID'
     }
   } as CLI_PROP,
   additionalProperties: false,
