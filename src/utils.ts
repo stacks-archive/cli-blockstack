@@ -455,11 +455,11 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
   return JSON.stringify(tokenRecords);
 }
 
-export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstackID: string, domain: String, privateKey:string): Promise<{did:string, jwt:string}> {
+export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstackID: string, domain: string, privateKey:string): Promise<{entries:{did:string, jwt:string}[]}> {
 
   const tokenSigner = new TokenSigner("ES256K", privateKey)
   const nameInfo = await network.getNameInfo(blockstackID);
-  const did = `did:btcr:${nameInfo.address}`
+  const did = nameInfo.did
   const payload = {
     iss: did,
     domain,
@@ -471,10 +471,12 @@ export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstack
   }
 
   const jwt = tokenSigner.sign(payload)
-  return {
-    did,
-    jwt
-  }
+  return {"entries": [
+    {
+      did,
+      jwt
+    }
+  ]}
 }
 /*
  * Broadcast a transaction and a zone file.

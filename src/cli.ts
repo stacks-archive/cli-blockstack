@@ -2695,7 +2695,7 @@ function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<str
 function getDidConfiguration(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const privateKey = decodePrivateKey(args[2]);
   return makeDIDConfiguration(network, args[0], args[1], args[2]).then(didConfiguration => {
-    return JSONStringify(didConfiguration).toString()
+    return JSONStringify(didConfiguration)
   })
 }
 
