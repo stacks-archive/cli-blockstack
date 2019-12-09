@@ -452,7 +452,7 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
   const signedToken = blockstack.signProfileToken(profileData, privateKey);
   const wrappedToken = blockstack.wrapProfileToken(signedToken);
   const tokenRecords = [wrappedToken];
-  return JSON.stringify(tokenRecords);
+  return JSONStringify(tokenRecords);
 }
 
 export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstackID: string, domain: string, privateKey:string): Promise<{entries:{did:string, jwt:string}[]}> {
