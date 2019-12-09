@@ -2301,6 +2301,9 @@ export const CLI_ARGS = {
       'The DID configuration should be placed in the json file ".well_known/did_configuration"' +
       '\n'+
       'Example:\n'+
+      '\n'+
+      '    $ # Tip: you can get your owner keys from your 12-word backup phrase using the get_owner_keys command.\n' +
+      '    $ export PRIVATE_OWNER_KEY="6e50431b955fe73f079469b24f06480aee44e4519282686433195b3c4b5336ef01"\n' +
       '    $ blockstack-cli get_did_configuration public_profile_for_testing.id.blockstack helloblockstack.com PRIVATE_OWNER_KEY\n' +
       '    {\n' +
       '       "entries": [\n'+
