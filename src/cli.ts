@@ -93,7 +93,8 @@ import {
   IDAppKeys,
   getIDAppKeys,
   hasKeys,
-  UTXO
+  UTXO,
+  makeDIDConfiguration
 } from './utils';
 
 import {
@@ -2691,6 +2692,12 @@ function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<str
   });
 }
 
+function getDidConfiguration(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const privateKey = decodePrivateKey(args[2]);
+  return makeDIDConfiguration(network, args[0], args[1], args[2]).then(didConfiguration => {
+    return JSONStringify(didConfiguration)
+  })
+}
 
 /*
  * Get a file from Gaia.
@@ -3369,6 +3376,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'get_blockchain_record': getNameBlockchainRecord,
   'get_blockchain_history': getNameHistoryRecord,
   'get_confirmations': getConfirmations,
+  'get_did_configuration': getDidConfiguration,
   'get_namespace_blockchain_record': getNamespaceBlockchainRecord,
   'get_app_keys': getAppKeys,
   'get_owner_keys': getOwnerKeys,

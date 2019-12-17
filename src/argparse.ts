@@ -2271,6 +2271,63 @@ export const CLI_ARGS = {
       '    ]\n' +
       '\n',
       group: 'Peer Services'
+    },
+    get_did_configuration: {
+      type: 'array',
+      items: [
+        {
+          name: 'blockstack_id',
+          type: 'string',
+          realtype: 'blockstack_id',
+          pattern: NAME_PATTERN + '|'+ SUBDOMAIN_PATTERN
+        },
+        {
+          name: 'domain',
+          type: 'string',
+          realtype: 'domain',
+          pattern: NAME_PATTERN + '|'+ SUBDOMAIN_PATTERN
+        },
+        {
+          name: 'owner_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN}`
+        },
+      ],
+      minItems: 3,
+      maxItems: 3,
+      help: 'Creates a DID configuration for the given blockstack id and domain to create a link between both.' +
+      'The specification is define by the Decentralized Identity Foundation at https://identity.foundation/specs/did-configuration/\n' +
+      'The DID configuration should be placed in the json file ".well_known/did_configuration"' +
+      '\n'+
+      'Example:\n'+
+      '\n'+
+      '    $ # Tip: you can get your owner keys from your 12-word backup phrase using the get_owner_keys command.\n' +
+      '    $ export PRIVATE_OWNER_KEY="6e50431b955fe73f079469b24f06480aee44e4519282686433195b3c4b5336ef01"\n' +
+      '    $ blockstack-cli get_did_configuration public_profile_for_testing.id.blockstack helloblockstack.com PRIVATE_OWNER_KEY\n' +
+      '    {\n' +
+      '       "entries": [\n'+
+      '          {\n' +
+      '            "did": "did:stack:v0:SewTRvPZUEQGdr45QvEnVMGHZBhx3FT1Jj-0",\n' +
+      '            "jwt": "eyJ0eXAiOiJKV1QiL...."\n' +
+      '          }\n'+
+      '       ]\n'+
+      '    }\n'+
+      '\n'+
+      'The decoded content of the jwt above is \n'+
+      '    {\n'+
+      '       "header": {\n' +
+      '          "typ": "JWT", "alg": "ES256K"\n' +
+      '       },\n'+
+      '       "payload": {\n' +
+      '           "iss": "did:stack:v0:SewTRvPZUEQGdr45QvEnVMGHZBhx3FT1Jj-0",\n' +
+      '           "domain": "helloblockstack.com",\n' +
+      '           "exp": "2020-12-07T13:05:28.375Z"\n' +
+      '       },\n'+
+      '       "signature": "NDY7ISzgAHKcZDvbxzTxQdVnf6xWMZ46w5vHcDpNx_1Fsyip0M6E6GMq_2YZ-gUcwmwlo8Ag9jgnfOkaBIFpoQ"\n' +
+      '    }\n' +
+      '\n',
+      group: 'DID'
     }
   } as CLI_PROP,
   additionalProperties: false,

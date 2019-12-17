@@ -5,6 +5,7 @@ import * as readline from 'readline';
 import * as stream from 'stream';
 import * as fs from 'fs';
 import * as blockstack from 'blockstack';
+import { decodeToken, SECP256K1Client, TokenSigner, TokenVerifier } from 'jsontokens'
 
 const ZoneFile = require('zone-file');
 
@@ -454,6 +455,29 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
   return JSONStringify(tokenRecords);
 }
 
+export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstackID: string, domain: string, privateKey:string): Promise<{entries:{did:string, jwt:string}[]}> {
+
+  const tokenSigner = new TokenSigner("ES256K", privateKey)
+  const nameInfo = await network.getNameInfo(blockstackID);
+  const did = nameInfo.did
+  const payload = {
+    iss: did,
+    domain,
+    exp: new Date(
+      new Date().setFullYear(
+        new Date().getFullYear() + 1
+      )
+    )
+  }
+
+  const jwt = tokenSigner.sign(payload)
+  return {"entries": [
+    {
+      did,
+      jwt
+    }
+  ]}
+}
 /*
  * Broadcast a transaction and a zone file.
  * Returns an object that encodes the success/failure of doing so.
