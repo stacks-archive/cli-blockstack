@@ -2789,6 +2789,36 @@ function gaiaPutFile(network: CLINetworkAdapter, args: string[]) : Promise<strin
     });
 }
 
+/*
+ * Delete a file in a Gaia hub
+ * args:
+ * @hubUrl (string) the URL to the write endpoint of the gaia hub
+ * @appPrivateKey (string) the private key used to authenticate to the gaia hub
+ * @gaiaPath (string) the path (in Gaia) to delete
+ * @wasSigned (string) OPTIONAL: if '1' or 'true'
+ */
+function gaiaDeleteFile(network: CLINetworkAdapter, args: string[]): Promise<string> {
+  const hubUrl = args[0];
+  const appPrivateKey = args[1];
+  const gaiaPath = path.normalize(args[2].replace(/^\/+/, ''));
+
+  let wasSigned = false;
+
+  if (args.length > 3 && !!args[3]) {
+    wasSigned = (args[3].toLowerCase() === 'true' || args[3].toLowerCase() === '1');
+  }
+
+  // force mainnet addresses
+  // TODO
+  blockstack.config.network.layer1 = bitcoin.networks.bitcoin;
+  return gaiaAuth(network, appPrivateKey, hubUrl)
+    .then((_userData: UserData) => {
+      return blockstack.deleteFile(gaiaPath, {wasSigned: wasSigned});
+    })
+    .then(() => {
+      return JSONStringify('ok');
+    });
+}
 
 /*
  * List files in a Gaia hub
@@ -3368,6 +3398,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'gaia_getfile': gaiaGetFile,
   'gaia_restore_bucket': gaiaRestoreBucket,
   'gaia_putfile': gaiaPutFile,
+  'gaia_deletefile': gaiaDeleteFile,
   'gaia_listfiles': gaiaListFiles,
   'gaia_sethub': gaiaSetHub,
   'get_address': getKeyAddress,
