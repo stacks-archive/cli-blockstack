@@ -2385,6 +2385,8 @@ Options can be:
                         (DANGEROUS)
 
     -T URL              Use an alternative Blockstack transaction broadcaster.
+    
+    -X URL              Use an alternative UTXO service endpoint.
 `;
 
 /*
@@ -2664,7 +2666,7 @@ interface CLI_OPTS {
 };
 
 export function getCLIOpts(argv: string[],
-  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:') : CLI_OPTS {
+  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:X:') : CLI_OPTS {
   const optsTable : CLI_OPTS = {};
   const remainingArgv = [];
   const argvBuff = argv.slice(0);

@@ -3453,6 +3453,7 @@ export function CLIMain() {
     const apiUrl = CLIOptAsString(opts, 'H');
     const transactionBroadcasterUrl = CLIOptAsString(opts, 'T');
     const nodeAPIUrl = CLIOptAsString(opts, 'I');
+    const utxoUrl = CLIOptAsString(opts, 'X');
 
     if (integration_test) {
       BLOCKSTACK_TEST = integration_test;
@@ -3477,6 +3478,10 @@ export function CLIMain() {
       configData.logConfig.level = 'info';
     }
 
+    if (utxoUrl) {
+       configData.utxoServiceUrl = utxoUrl;
+    }
+
     winston.configure({ level: configData.logConfig.level, transports: [new winston.transports.Console(configData.logConfig)] });
      
     const cliOpts : CLI_NETWORK_OPTS = {
@@ -3491,7 +3496,7 @@ export function CLIMain() {
       altTransactionBroadcasterUrl: (transactionBroadcasterUrl ? 
         transactionBroadcasterUrl : 
         configData.broadcastServiceUrl),
-      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl)
+      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl),
     };
 
     // wrap command-line options
