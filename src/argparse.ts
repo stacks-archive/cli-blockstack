@@ -1053,6 +1053,37 @@ export const CLI_ARGS = {
       '\n',
       group: 'Key Management'
     },
+    get_payment_key_24: {
+      type: 'array',
+      items: [
+        {
+          name: 'backup_phrase',
+          type: 'string',
+          realtype: '24_words_or_ciphertext'
+        }
+      ],
+      minItems: 1,
+      maxItems: 1,
+      help: 'Get the payment private key from a 24-word backup phrase.  If you provide an ' +
+      'encrypted backup phrase, you will be asked for your password to decrypt it.  This command ' +
+      'will tell you your Bitcoin and Stacks token addresses as well.\n' +
+      '\n' +
+      'Example\n' +
+      '\n' +
+      '    $ blockstack-cli get_payment_key_24 "toast canal educate tissue express melody produce later gospel victory meadow outdoor hollow catch liberty annual gasp hat hello april equip thank neck cruise"\n' +
+      '    [\n' +
+      '      {\n' +
+      '        "privateKey": "a25cea8d310ce656c6d427068c77bad58327334f73e39c296508b06589bc4fa201",\n' +
+      '        "address": {\n' +
+      '          "BTC": "1ATAW6TAbTCKgU3xPgAcWQwjW9Q26Eambx",\n' +
+      '          "STACKS": "SP1KTQR7CTQNA20SV2VNTF9YABMR6RJERSES3KC6Z"\n' +
+      '        },\n' +
+      '        "index": 0\n' +
+      '      }\n' +
+      '    ]\n' +
+      '\n',
+      group: 'Key Management'
+    },
     get_zonefile: {
       type: 'array',
       items: [
