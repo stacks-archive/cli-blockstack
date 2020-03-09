@@ -557,6 +557,46 @@ export const CLI_ARGS = {
       '    }\n',
       group: 'Gaia'
     },
+    gaia_deletefile: {
+      type: 'array',
+      items: [
+        {
+          name: 'gaia_hub',
+          type: 'string',
+          realtype: 'url',
+          pattern: URL_PATTERN
+        },
+        {
+          name: 'app_private_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: PRIVATE_KEY_UNCOMPRESSED_PATTERN
+        },
+        {
+          name: 'gaia_filename',
+          type: 'string',
+          realtype: 'filename',
+          pattern: '.+'
+        },
+        {
+          name: 'was_signed',
+          type: 'string',
+          realtype: 'boolean',
+          pattern: BOOLEAN_PATTERN
+        }
+      ],
+      minItems: 3,
+      maxItems: 4,
+      help: 'Delete a file in a Gaia hub, as well as its signature metadata (which is stored in a separate file).' +
+          '\n' +
+          'Example:\n' +
+          '\n' +
+          '    $ # Tip: You can obtain the app key with the get_app_keys command.\n' +
+          '    $ export APP_KEY="3ac770e8c3d88b1003bf4a0a148ceb920a6172bdade8e0325a1ed1480ab4fb19"\n' +
+          '    $ blockstack-cli gaia_deletefile https://hub.blockstack.org "$APP_KEY" file.txt false\n' +
+          '    ok',
+      group: 'Gaia'
+    },
     gaia_listfiles: {
       type: 'array',
       items: [
