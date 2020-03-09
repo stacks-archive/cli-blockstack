@@ -579,7 +579,7 @@ export const CLI_ARGS = {
           pattern: '.+'
         },
         {
-          name: 'wasSigned',
+          name: 'was_signed',
           type: 'string',
           realtype: 'boolean',
           pattern: BOOLEAN_PATTERN
@@ -587,10 +587,12 @@ export const CLI_ARGS = {
       ],
       minItems: 3,
       maxItems: 4,
-      help: 'Delete a file in a Gaia hub. ' +
+      help: 'Delete a file in a Gaia hub, as well as its signature metadata (which is stored in a separate file).' +
           '\n' +
           'Example:\n' +
           '\n' +
+          '    $ # Tip: You can obtain the app key with the get_app_keys command.\n' +
+          '    $ export APP_KEY="3ac770e8c3d88b1003bf4a0a148ceb920a6172bdade8e0325a1ed1480ab4fb19"\n' +
           '    $ blockstack-cli gaia_deletefile https://hub.blockstack.org "$APP_KEY" file.txt false\n' +
           '    ok',
       group: 'Gaia'

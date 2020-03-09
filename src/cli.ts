@@ -2795,7 +2795,7 @@ function gaiaPutFile(network: CLINetworkAdapter, args: string[]) : Promise<strin
  * @hubUrl (string) the URL to the write endpoint of the gaia hub
  * @appPrivateKey (string) the private key used to authenticate to the gaia hub
  * @gaiaPath (string) the path (in Gaia) to delete
- * @wasSigned (string) OPTIONAL: if '1' or 'true'
+ * @wasSigned (string) OPTIONAL: if '1' or 'true'.  Delete the signature file as well.
  */
 function gaiaDeleteFile(network: CLINetworkAdapter, args: string[]): Promise<string> {
   const hubUrl = args[0];
@@ -3394,12 +3394,12 @@ const COMMANDS : Record<string, CommandFunction> = {
   'decrypt_keychain': decryptMnemonic,
   'docs': printDocs,
   'encrypt_keychain': encryptMnemonic,
+  'gaia_deletefile': gaiaDeleteFile,
   'gaia_dump_bucket': gaiaDumpBucket,
   'gaia_getfile': gaiaGetFile,
-  'gaia_restore_bucket': gaiaRestoreBucket,
-  'gaia_putfile': gaiaPutFile,
-  'gaia_deletefile': gaiaDeleteFile,
   'gaia_listfiles': gaiaListFiles,
+  'gaia_putfile': gaiaPutFile,
+  'gaia_restore_bucket': gaiaRestoreBucket,
   'gaia_sethub': gaiaSetHub,
   'get_address': getKeyAddress,
   'get_account_at': getAccountAt,
