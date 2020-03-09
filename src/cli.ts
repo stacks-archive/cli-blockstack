@@ -26,6 +26,7 @@ import {
 import {
   getOwnerKeyInfo,
   getPaymentKeyInfo,
+  getStacksWalletKeyInfo,
   getApplicationKeyInfo,
   extractAppKey,
   STRENGTH,
@@ -2333,6 +2334,20 @@ async function getPaymentKey(network: CLINetworkAdapter, args: string[]) : Promi
 }
 
 /*
+ * Get the payment private key from a backup phrase used by the Stacks wallet
+ * args:
+ * @mnemonic (string) the 24-word phrase
+ */
+async function getStacksWalletKey(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const mnemonic = await getBackupPhrase(args[0]);
+  // keep the return value consistent with getOwnerKeys
+  const keyObj = await getStacksWalletKeyInfo(network, mnemonic);
+  const keyInfo: PaymentKeyInfoType[] = [];
+  keyInfo.push(keyObj);
+  return JSONStringify(keyInfo);
+}
+
+/*
  * Make a private key and output it 
  * args:
  * @mnemonic (string) OPTIONAL; the 12-word phrase
@@ -3412,6 +3427,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'get_app_keys': getAppKeys,
   'get_owner_keys': getOwnerKeys,
   'get_payment_key': getPaymentKey,
+  'get_stacks_wallet_key': getStacksWalletKey,
   'get_zonefile': getZonefile,
   'lookup': lookup,
   'make_keychain': makeKeychain,
