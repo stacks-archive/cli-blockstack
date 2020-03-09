@@ -115,7 +115,7 @@ export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : s
 }
 
 /*
- * Get the payment key information for a 24-word phrase.
+ * Get the payment key information for a 24-word phrase used by the Stacks wallet.
  * @network (object) the blockstack network
  * @mnemonic (string) the 24-word phrase
  *
@@ -123,10 +123,10 @@ export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : s
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
-export async function getPaymentKeyInfo24(network: CLINetworkAdapter, mnemonic : string): Promise<PaymentKeyInfoType> {
+export async function getStacksWalletKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<PaymentKeyInfoType> {
   const seed = await bip39.mnemonicToSeed(mnemonic)
   const master = bip32.fromSeed(seed)
-  const child = master.derivePath(`m/44'/5757'/0'/0/0`)
+  const child = master.derivePath(`m/44'/5757'/0'/0/0`)     // taken from stacks-wallet. See https://github.com/blockstack/stacks-wallet
   const ecPair = bitcoin.ECPair.fromPrivateKey(child.privateKey)
   const privkey = blockstack.ecPairToHexString(ecPair)
   
