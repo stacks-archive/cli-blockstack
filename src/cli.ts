@@ -389,7 +389,7 @@ function txPreorder(network: CLINetworkAdapter, args: string[], preorderTxOnly: 
 
   if (estimateOnly) {
     return estimatePromise
-      .then((cost: number) => String(cost));
+      .then((cost: number) => JSONStringify({cost: cost}));
   }
   
   if (!safetyChecks) {
@@ -549,7 +549,7 @@ function txRegister(network: CLINetworkAdapter, args: string[], registerTxOnly: 
 
   if (estimateOnly) {
     return estimatePromise
-      .then((cost: number) => String(cost));
+      .then((cost: number) => JSONStringify({cost: cost}));
   }
  
   if (!safetyChecks) {
@@ -1807,6 +1807,18 @@ function register(network: CLINetworkAdapter, args: string[]) : Promise<string> 
   })
     .then(([preorderSafetyChecks, registerSafetyChecks]) => {
       if (!checkTxStatus(preorderSafetyChecks) || !checkTxStatus(registerSafetyChecks)) {
+        try {
+           preorderSafetyChecks = JSON.parse(preorderSafetyChecks);
+        }
+        catch (e) {
+        }
+
+        try {
+           registerSafetyChecks = JSON.parse(registerSafetyChecks);
+        }
+        catch (e) {
+        }
+
       // one or both safety checks failed 
         throw new SafetyError({
           'status': false,
