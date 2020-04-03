@@ -1990,25 +1990,25 @@ export const CLI_ARGS = {
           pattern: STACKS_ADDRESS_PATTERN
         },
         {
-          name: 'type',
-          type: 'string',
-          realtype: 'token-type',
-          pattern: `^${NAMESPACE_PATTERN}$|^STACKS$`
-        },
-        {
           name: 'amount',
           type: 'string',
           realtype: 'integer',
           pattern: '^[0-9]+$'
         },
         {
-          name: 'payment_key',
+          name: 'feerate',
           type: 'string',
-          realtype: 'private_key',
-          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
         },
         {
-          name: 'bitcoin_fee_key',
+          name: 'nonce',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`

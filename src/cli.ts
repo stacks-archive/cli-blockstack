@@ -12,6 +12,7 @@ import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
 import fetch from 'node-fetch';
+import { makeSTXTokenTransfer } from '@blockstack/stacks-transactions'
 
 const c32check = require('c32check');
 
@@ -2576,104 +2577,33 @@ function sendBTC(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * Send tokens from one account private key to another account's address.
  * args:
  * @recipientAddress (string) the recipient's account address
- * @tokenType (string) the type of tokens to send
  * @tokenAmount (int) the number of tokens to send
+ * @feeRate (int) the fee rate to pay 
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
  * @privateKey (string) the hex-encoded private key to use to send the tokens
- * @privateKeyBTC (string) the hex-encoded private key to use to fund the BTC fee
  * @memo (string) OPTIONAL: a 34-byte memo to include
  */
 function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const recipientAddress = c32check.c32ToB58(args[0]);
-  const tokenType = args[1];
-  const tokenAmount = new BN(args[2]);
-  const privateKey = decodePrivateKey(args[3]);
-  const privateKeyBTC = decodePrivateKey(args[4]);
+  const recipientAddress = args[0];
+  const tokenAmount = new BN(args[1]);
+  const feeRate = new BN(args[2]);
+  const nonce = new BN(args[3]);
+  const privateKey = args[4];
+
   let memo = '';
 
   if (args.length > 4 && !!args[5]) {
     memo = args[5];
   }
 
-  const senderAddress = getPrivateKeyAddress(network, privateKey);
-  const senderUTXOsPromise = network.getUTXOs(senderAddress);
-
-  const txPromise = blockstack.transactions.makeTokenTransfer(
-    recipientAddress, tokenType, tokenAmount, memo, privateKey, privateKeyBTC, !hasKeys(privateKey));
-
-  const estimatePromise = senderUTXOsPromise.then((utxos) => {
-    const numUTXOs = utxos.length;
-    return blockstack.transactions.estimateTokenTransfer(
-      recipientAddress, tokenType, tokenAmount, memo, numUTXOs);
-  });
-
-  if (estimateOnly) {
-    return estimatePromise
-      .then((cost: number) => String(cost));
+  const options = {
+    nonce,
+    memo
   }
 
-  if (!safetyChecks) {
-    if (txOnly) {
-      return txPromise;
-    }
-    else {
-      return txPromise.then((tx) => {
-        return network.broadcastTransaction(tx);
-      });
-    }
-  }
+  const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
 
-  const btcBalancePromise = senderUTXOsPromise.then((utxos) => {
-    return sumUTXOs(utxos);
-  });
-
-  const receiverIsDistinctPromise = Promise.resolve().then(() => {
-     return recipientAddress != senderAddress
-  });
-
-  const accountStatePromise = network.getAccountStatus(senderAddress, tokenType);
-  const tokenBalancePromise = network.getAccountBalance(senderAddress, tokenType);
-  const blockHeightPromise = network.getBlockHeight();
-
-  const safetyChecksPromise = Promise.all(
-    [tokenBalancePromise, estimatePromise, btcBalancePromise,
-      accountStatePromise, blockHeightPromise, receiverIsDistinctPromise])
-    .then(([tokenBalance, estimate, btcBalance, 
-      accountState, blockHeight, receiverIsDistinct]) => {
-      if (btcBalance >= estimate && tokenBalance.cmp(tokenAmount) >= 0 &&
-          accountState.lock_transfer_block_id <= blockHeight && receiverIsDistinct) {
-        return {'status': true};
-      }
-      else {
-        return {
-          'status': false,
-          'error': 'TokenTransfer cannot be safely sent',
-          'lockTransferBlockHeight': accountState.lock_transfer_block_id,
-          'senderBalanceBTC': btcBalance,
-          'estimateCostBTC': estimate,
-          'tokenBalance': tokenBalance.toString(),
-          'blockHeight': blockHeight,
-          'receiverIsDistinctFromSender': receiverIsDistinct
-        };
-      }
-    });
-
-  return safetyChecksPromise
-    .then((safetyChecksResult) => {
-      if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
-      }
-      
-      if (txOnly) {
-        return txPromise;
-      }
-
-      return txPromise.then((tx) => {
-        return network.broadcastTransaction(tx);
-      })
-        .then((txidHex) => {
-          return txidHex;
-        });
-    });
+  return Promise.resolve(tx.serialize().toString('hex'));
 }
 
 /*
