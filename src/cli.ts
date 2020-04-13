@@ -2603,7 +2603,11 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
 
   const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
 
-  return Promise.resolve(tx.serialize().toString('hex'));
+  return tx.broadcast().then(() => {
+    return tx.txid();
+  }).catch((error) => {
+    return error.toString();
+  });
 }
 
 /*

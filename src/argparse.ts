@@ -1996,7 +1996,7 @@ export const CLI_ARGS = {
           pattern: '^[0-9]+$'
         },
         {
-          name: 'feerate',
+          name: 'fee rate',
           type: 'string',
           realtype: 'integer',
           pattern: '^[0-9]+$'
@@ -2029,48 +2029,32 @@ export const CLI_ARGS = {
       'via the `get_confirmations` command.  Once the transaction has 7 confirmations, the Blockstack peer network ' +
       'will have processed it, and your payment key balance and recipient balance will be updated.\n' +
       '\n' +
-      'At this time, token transfers are encoded as Bitcoin transactions.  As such, you will need to pay a transaction ' +
-      'fee in Bitcoin.  Your payment key should have both a Bitcoin balance and a Stacks balance (you can check with ' +
-      'the "balance" command).\n' +
-      '\n' +
       'Example:\n' +
       '\n' +
       '    $ # check balances of sender and recipient before sending.\n' +
       '    $ # address of the key below is SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
-       '    $ export BTC_PAYMENT="4be95a5987ec727c033aa48a3fb1dbadb750446c1c63a02707a0b1c28e7ec17801"\n' +
       '    $ blockstack-cli balance SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    {\n' +
-      '      "BTC": "125500"\n' +
       '      "STACKS": "10000000"\n' +
       '    }\n' +
       '    $ blockstack-cli balance SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY\n' +
       '    {\n' +
-      '      "BTC": "0"\n' +
       '      "STACKS": "0"\n' +
       '    }\n' +
       '\n' +
       '    $ # send tokens\n' +
-      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY STACKS 12345 "$PAYMENT" "$BTC_PAYMENT"\n' +
+      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY 12345 1 0 "$PAYMENT"\n' +
       '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
       '\n' +
-      '    $ # wait 7 confirmations\n' +
-      '    $ blockstack-cli get_confirmations a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
-      '    {\n' +
-      '      "blockHeight": 567890,\n' +
-      '      "confirmations": 7,\n' +
-      '    }\n' +
+      '    $ # wait for transaction to be confirmed\n' +
       '\n' +
-      '    $ # check balance again.  The recipient receives some dust to encode the Stacks transfer,\n' +
-      '    $ # and the sender pays for the transaction fee.\n' +
       '    $ blockstack-cli balance SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    {\n' +
-      '      "BTC": "117000"\n' +
       '      "STACKS": "9987655"\n' +
       '    }\n' +
       '    $ blockstack-cli balance SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY\n' +
       '    {\n' +
-      '      "BTC": "5500"\n' +
       '      "STACKS": "12345"\n' +
       '    }\n' +
       '\n',
