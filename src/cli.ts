@@ -12,7 +12,7 @@ import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
 import fetch from 'node-fetch';
-import { makeSTXTokenTransfer } from '@blockstack/stacks-transactions'
+import { makeSTXTokenTransfer, TransactionVersion } from '@blockstack/stacks-transactions'
 
 const c32check = require('c32check');
 
@@ -2601,7 +2601,8 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
 
   const options = {
     nonce,
-    memo
+    memo,
+    version: network.isMainnet() ? TransactionVersion.Mainnet : TransactionVersion.Testnet
   }
 
   const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);

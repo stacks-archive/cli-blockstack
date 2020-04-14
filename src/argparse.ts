@@ -1224,17 +1224,8 @@ export const CLI_ARGS = {
       '    $ blockstack-cli make_keychain\n' +
       '    {\n' + 
       '      "mnemonic": "apart spin rich leader siren foil dish sausage fee pipe ethics bundle",\n' +
-      '      "ownerKeyInfo": {\n' +
-      '        "idAddress": "ID-192yxWSvZrss3f4ZY48tUMJJxQvuB6DcXE",\n' +
-      '        "index": 0,\n' +
-      '        "privateKey": "c0a1c606bf509059be1be27aeb88a60bb530910e16e2e605c7ef9e20a0d6bbb001",\n' +
-      '        "version": "v0.10-current"\n' +
-      '      },\n' +
-      '      "paymentKeyInfo": {\n' +
-      '        "address": {\n' +
-      '          "BTC": "1MRq8Vzb2pCVx9fcrBThWaV7reHhudt3ix",\n' +
-      '          "STACKS": "SP3G19B6J50FH6JGXAKS06N6WA1XPJCKKM4JCHC2D"\n' +
-      '        },\n' +
+      '      "keyInfo": {\n' +
+      '        "address": "SP3G19B6J50FH6JGXAKS06N6WA1XPJCKKM4JCHC2D"\n' +
       '        "index": 0,\n' +
       '        "privateKey": "56d30f2b605ed114c7dc45599ae521c525d07e1286fbab67452a6586ea49332a01"\n' +
       '      }\n' +
