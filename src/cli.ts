@@ -31,8 +31,10 @@ import {
   getApplicationKeyInfo,
   extractAppKey,
   STRENGTH,
+  STX_WALLET_COMPATIBLE_SEED_STRENGTH,
   PaymentKeyInfoType,
-  OwnerKeyInfoType
+  OwnerKeyInfoType,
+  StacksKeyInfoType
 } from './keys';
 
 import {
@@ -2355,7 +2357,7 @@ async function getStacksWalletKey(network: CLINetworkAdapter, args: string[]) : 
   const mnemonic = await getBackupPhrase(args[0]);
   // keep the return value consistent with getOwnerKeys
   const keyObj = await getStacksWalletKeyInfo(network, mnemonic);
-  const keyInfo: PaymentKeyInfoType[] = [];
+  const keyInfo: StacksKeyInfoType[] = [];
   keyInfo.push(keyObj);
   return JSONStringify(keyInfo);
 }
@@ -2370,15 +2372,16 @@ async function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promis
   if (args[0]) {
     mnemonic = await getBackupPhrase(args[0]);
   } else {
-    mnemonic = await bip39.generateMnemonic(STRENGTH, crypto.randomBytes);
+    mnemonic = await bip39.generateMnemonic(
+      STX_WALLET_COMPATIBLE_SEED_STRENGTH, 
+      crypto.randomBytes
+    );
   }
 
-  const ownerKeyInfo = await getOwnerKeyInfo(network, mnemonic, 0);
-  const paymentKeyInfo = await getPaymentKeyInfo(network, mnemonic);
+  const stacksKeyInfo = await getStacksWalletKeyInfo(network, mnemonic);
   return JSONStringify({
     'mnemonic': mnemonic,
-    'ownerKeyInfo': ownerKeyInfo,
-    'paymentKeyInfo': paymentKeyInfo
+    'keyInfo': stacksKeyInfo
   });
 }
 
