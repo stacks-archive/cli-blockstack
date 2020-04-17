@@ -114,6 +114,7 @@ let receiveFeesPeriod = 52595;
 let gracePeriod = 5000;
 let noExit = false;
 let maxIDSearchIndex = DEFAULT_MAX_ID_SEARCH_INDEX;
+let defaultV2BroadcastUrl = 'https://core.blockstack.org/v2/transactions';
 
 let BLOCKSTACK_TEST = process.env.BLOCKSTACK_TEST ? true : false;
 
@@ -2607,7 +2608,11 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
 
   const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
 
-  return tx.broadcast().then(() => {
+  if (txOnly) {
+    return Promise.resolve(tx.serialize().toString('hex'));
+  }
+
+  return tx.broadcast(defaultV2BroadcastUrl).then(() => {
     return tx.txid();
   }).catch((error) => {
     return error.toString();
@@ -3449,6 +3454,7 @@ export function CLIMain() {
     const magicBytes = CLIOptAsString(opts, 'm');
     const apiUrl = CLIOptAsString(opts, 'H');
     const transactionBroadcasterUrl = CLIOptAsString(opts, 'T');
+    defaultV2BroadcastUrl = opts['T'] ? CLIOptAsString(opts, 'T') : defaultV2BroadcastUrl;
     const nodeAPIUrl = CLIOptAsString(opts, 'I');
     const utxoUrl = CLIOptAsString(opts, 'X');
 
