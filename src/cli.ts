@@ -2394,57 +2394,25 @@ async function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promis
  */
 function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   let address = args[0];
-  if (address.match(STACKS_ADDRESS_PATTERN)) {
-    address = c32check.c32ToB58(address);
-  }
 
   if (BLOCKSTACK_TEST) {
     // force testnet address if we're in regtest or testnet mode
     address = network.coerceAddress(address);
   }
 
-  return Promise.resolve().then(() => {
-    return network.getAccountTokens(address);
-  })
-    .then((tokenList) => {
-      let tokenAndBTC = tokenList.tokens;
-      if (!tokenAndBTC) {
-        tokenAndBTC = [];
+  return fetch(`${network.blockstackAPIUrl}/v2/accounts/${address}?proof=0`)
+    .then((response) => response.json())
+    .then((response) => {
+      var balanceHex = response.balance;
+      if(balanceHex.startsWith('0x')) {
+        balanceHex = balanceHex.substr(2);
       }
-
-      tokenAndBTC.push('BTC');
-
-      return Promise.all(tokenAndBTC.map((tokenType : string) => {
-        if (tokenType === 'BTC') {
-          return Promise.resolve().then(() => {
-            return network.getUTXOs(address);
-          })
-            .then((utxoList : UTXO[]) => {
-              return {
-                'token': 'BTC',
-                'amount': `${sumUTXOs(utxoList)}`
-              };
-            });
-        }
-        else {
-          return Promise.resolve().then(() => {
-            return network.getAccountBalance(address, tokenType);
-          })
-            .then((tokenBalance : import('bn.js')) => {
-              return {
-                'token': tokenType,
-                'amount': tokenBalance.toString()
-              };
-            });
-        }
-      }));
-    })
-    .then((tokenBalances : [{token: string, amount: string}]) => {
-      const ret : Record<string, string> = {};
-      for (const tokenInfo of tokenBalances) {
-        ret[tokenInfo.token] = tokenInfo.amount;
+      const balance = new BN(balanceHex, 16);
+      const res = {
+        balance: balance.toString(10),
+        nonce: response.nonce
       }
-      return JSONStringify(ret);
+      return Promise.resolve(JSONStringify(res));
     });
 }
 
