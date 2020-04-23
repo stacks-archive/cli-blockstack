@@ -2571,7 +2571,8 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
   const options = {
     nonce,
     memo,
-    version: network.isMainnet() ? TransactionVersion.Mainnet : TransactionVersion.Testnet
+    version: network.isMainnet() ? TransactionVersion.Mainnet : TransactionVersion.Testnet,
+    chainId: TransactionVersion.Testnet ? 0x80000000 : 0x00000000
   }
 
   const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
