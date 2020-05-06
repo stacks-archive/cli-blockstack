@@ -12,7 +12,7 @@ import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
 import fetch from 'node-fetch';
-import { makeSTXTokenTransfer, TransactionVersion } from '@blockstack/stacks-transactions'
+import { makeSTXTokenTransfer, TransactionVersion } from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
 
@@ -105,6 +105,7 @@ import {
   handleAuth,
   handleSignIn
 } from './auth';
+import { TokenTransferOptions } from '@blockstack/stacks-transactions/lib/src/builders';
 
 // global CLI options
 let txOnly = false;
@@ -1812,18 +1813,18 @@ function register(network: CLINetworkAdapter, args: string[]) : Promise<string> 
     .then(([preorderSafetyChecks, registerSafetyChecks]) => {
       if (!checkTxStatus(preorderSafetyChecks) || !checkTxStatus(registerSafetyChecks)) {
         try {
-           preorderSafetyChecks = JSON.parse(preorderSafetyChecks);
+          preorderSafetyChecks = JSON.parse(preorderSafetyChecks);
         }
         catch (e) {
         }
 
         try {
-           registerSafetyChecks = JSON.parse(registerSafetyChecks);
+          registerSafetyChecks = JSON.parse(registerSafetyChecks);
         }
         catch (e) {
         }
 
-      // one or both safety checks failed 
+        // one or both safety checks failed 
         throw new SafetyError({
           'status': false,
           'error': 'Failed to generate one or more transactions',
@@ -2403,7 +2404,7 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   return fetch(`${network.blockstackAPIUrl}/v2/accounts/${address}?proof=0`)
     .then((response) => response.json())
     .then((response) => {
-      var balanceHex = response.balance;
+      let balanceHex = response.balance;
       if(balanceHex.startsWith('0x')) {
         balanceHex = balanceHex.substr(2);
       }
@@ -2411,7 +2412,7 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
       const res = {
         balance: balance.toString(10),
         nonce: response.nonce
-      }
+      };
       return Promise.resolve(JSONStringify(res));
     });
 }
@@ -2568,12 +2569,12 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
     memo = args[5];
   }
 
-  const options = {
+  const options: TokenTransferOptions = {
     nonce,
     memo,
     version: network.isMainnet() ? TransactionVersion.Mainnet : TransactionVersion.Testnet,
     chainId: TransactionVersion.Testnet ? 0x80000000 : 0x00000000
-  }
+  };
 
   const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
 
@@ -2634,8 +2635,8 @@ function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<str
 function getDidConfiguration(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const privateKey = decodePrivateKey(args[2]);
   return makeDIDConfiguration(network, args[0], args[1], args[2]).then(didConfiguration => {
-    return JSONStringify(didConfiguration)
-  })
+    return JSONStringify(didConfiguration);
+  });
 }
 
 /*
@@ -3426,6 +3427,8 @@ export function CLIMain() {
     defaultV2BroadcastUrl = opts['T'] ? CLIOptAsString(opts, 'T') : defaultV2BroadcastUrl;
     const nodeAPIUrl = CLIOptAsString(opts, 'I');
     const utxoUrl = CLIOptAsString(opts, 'X');
+    const bitcoindUsername = CLIOptAsString(opts, 'u');
+    const bitcoindPassword = CLIOptAsString(opts, 'p');
 
     if (integration_test) {
       BLOCKSTACK_TEST = integration_test;
@@ -3449,9 +3452,15 @@ export function CLIMain() {
     else {
       configData.logConfig.level = 'info';
     }
+    if (bitcoindUsername) {
+      configData.bitcoindUsername = bitcoindUsername;
+    }
+    if (bitcoindPassword) {
+      configData.bitcoindPassword = bitcoindPassword;
+    }
 
     if (utxoUrl) {
-       configData.utxoServiceUrl = utxoUrl;
+      configData.utxoServiceUrl = utxoUrl;
     }
 
     winston.configure({ level: configData.logConfig.level, transports: [new winston.transports.Console(configData.logConfig)] });
@@ -3468,7 +3477,7 @@ export function CLIMain() {
       altTransactionBroadcasterUrl: (transactionBroadcasterUrl ? 
         transactionBroadcasterUrl : 
         configData.broadcastServiceUrl),
-      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl),
+      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl)
     };
 
     // wrap command-line options
