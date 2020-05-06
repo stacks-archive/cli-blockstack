@@ -308,7 +308,7 @@ export function getNetwork(configData: CLI_CONFIG_TYPE, regTest: boolean) : Bloc
     const network = new blockstack.network.LocalRegtest(
       configData.blockstackAPIUrl, configData.broadcastServiceUrl, 
       new blockstack.network.BitcoindAPI(configData.utxoServiceUrl,
-        { username: 'blockstack', password: 'blockstacksystem' }));
+        { username: configData.bitcoindUsername || 'blockstack', password: configData.bitcoindPassword || 'blockstacksystem' }));
 
     return network;
   } else {

@@ -74,7 +74,9 @@ export interface CLI_CONFIG_TYPE {
   blockstackNodeUrl: string,
   broadcastServiceUrl: string,
   utxoServiceUrl: string,
-  logConfig: CLI_LOG_CONFIG_TYPE
+  logConfig: CLI_LOG_CONFIG_TYPE,
+  bitcoindUsername?: string,
+  bitcoindPassword?: string,
 };
 
 const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
@@ -99,7 +101,9 @@ const CONFIG_REGTEST_DEFAULTS : CLI_CONFIG_TYPE = {
   blockstackNodeUrl: 'http://localhost:16264',
   broadcastServiceUrl: 'http://localhost:16269',
   utxoServiceUrl: 'http://localhost:18332',
-  logConfig: LOG_CONFIG_DEFAULTS
+  logConfig: LOG_CONFIG_DEFAULTS,
+  bitcoindPassword: 'blockstacksystem',
+  bitcoindUsername: 'blockstack'
 };
 
 const PUBLIC_TESTNET_HOST = 'testnet.blockstack.org';
@@ -2341,7 +2345,7 @@ export const CLI_ARGS = {
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -2436,6 +2440,10 @@ Options can be:
     -T URL              Use an alternative Blockstack transaction broadcaster.
     
     -X URL              Use an alternative UTXO service endpoint.
+
+    -u USERNAME         A username to be passed to bitcoind RPC endpoints
+
+    -p PASSWORD         A password to be passed to bitcoind RPC endpoints
 `;
 
 /*
@@ -2715,7 +2723,7 @@ interface CLI_OPTS {
 };
 
 export function getCLIOpts(argv: string[],
-  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:X:') : CLI_OPTS {
+  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:X:u:p:') : CLI_OPTS {
   const optsTable : CLI_OPTS = {};
   const remainingArgv = [];
   const argvBuff = argv.slice(0);
