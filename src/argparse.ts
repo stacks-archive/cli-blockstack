@@ -89,9 +89,9 @@ const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
 };
 
 const CONFIG_DEFAULTS : CLI_CONFIG_TYPE = {
-  blockstackAPIUrl: 'https://core.blockstack.org',
-  blockstackNodeUrl: 'https://node.blockstack.org:6263',
-  broadcastServiceUrl: 'https://broadcast.blockstack.org',
+  blockstackAPIUrl: 'http://core.blockstack.org:20443',
+  blockstackNodeUrl: 'http://core.blockstack.org:20443',
+  broadcastServiceUrl: 'http://core.blockstack.org:20443/v2/transactions',
   utxoServiceUrl: 'https://blockchain.info',
   logConfig: LOG_CONFIG_DEFAULTS
 };
@@ -106,12 +106,12 @@ const CONFIG_REGTEST_DEFAULTS : CLI_CONFIG_TYPE = {
   bitcoindUsername: 'blockstack'
 };
 
-const PUBLIC_TESTNET_HOST = 'testnet.blockstack.org';
+const PUBLIC_TESTNET_HOST = 'neon.blockstack.org';
 
 const CONFIG_TESTNET_DEFAULTS = {
-  blockstackAPIUrl: `http://${PUBLIC_TESTNET_HOST}:16268`,
-  blockstackNodeUrl: `http://${PUBLIC_TESTNET_HOST}:16264`,
-  broadcastServiceUrl: `http://${PUBLIC_TESTNET_HOST}:16269`,
+  blockstackAPIUrl: `http://${PUBLIC_TESTNET_HOST}:20443`,
+  blockstackNodeUrl: `http://${PUBLIC_TESTNET_HOST}:20443`,
+  broadcastServiceUrl: `http://${PUBLIC_TESTNET_HOST}:20443/v2/transactions`,
   utxoServiceUrl: `http://${PUBLIC_TESTNET_HOST}:18332`,
   logConfig: Object.assign({}, LOG_CONFIG_DEFAULTS, { level: 'debug' })
 };
@@ -1991,7 +1991,7 @@ export const CLI_ARGS = {
           pattern: '^[0-9]+$'
         },
         {
-          name: 'fee rate',
+          name: 'fee',
           type: 'string',
           realtype: 'integer',
           pattern: '^[0-9]+$'

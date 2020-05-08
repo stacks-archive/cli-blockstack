@@ -12,7 +12,14 @@ import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
 import fetch from 'node-fetch';
-import { makeSTXTokenTransfer, TransactionVersion } from '@blockstack/stacks-transactions';
+import { 
+  makeSTXTokenTransfer,
+  broadcastTransaction,
+  estimateTransfer,
+  StacksMainnet,
+  StacksTestnet,
+  TokenTransferOptions
+} from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
 
@@ -105,7 +112,6 @@ import {
   handleAuth,
   handleSignIn
 } from './auth';
-import { TokenTransferOptions } from '@blockstack/stacks-transactions/lib/src/builders';
 
 // global CLI options
 let txOnly = false;
@@ -115,7 +121,6 @@ let receiveFeesPeriod = 52595;
 let gracePeriod = 5000;
 let noExit = false;
 let maxIDSearchIndex = DEFAULT_MAX_ID_SEARCH_INDEX;
-let defaultV2BroadcastUrl = 'https://core.blockstack.org/v2/transactions';
 
 let BLOCKSTACK_TEST = process.env.BLOCKSTACK_TEST ? true : false;
 
@@ -2401,7 +2406,11 @@ function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
     address = network.coerceAddress(address);
   }
 
-  return fetch(`${network.blockstackAPIUrl}/v2/accounts/${address}?proof=0`)
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  return fetch(txNetwork.getAccountApiUrl(address))
     .then((response) => response.json())
     .then((response) => {
       let balanceHex = response.balance;
@@ -2551,15 +2560,15 @@ function sendBTC(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * args:
  * @recipientAddress (string) the recipient's account address
  * @tokenAmount (int) the number of tokens to send
- * @feeRate (int) the fee rate to pay 
+ * @fee (int) the transaction fee to be paid
  * @nonce (int) integer nonce needs to be incremented after each transaction from an account
  * @privateKey (string) the hex-encoded private key to use to send the tokens
  * @memo (string) OPTIONAL: a 34-byte memo to include
  */
-function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const recipientAddress = args[0];
   const tokenAmount = new BN(args[1]);
-  const feeRate = new BN(args[2]);
+  const fee = new BN(args[2]);
   const nonce = new BN(args[3]);
   const privateKey = args[4];
 
@@ -2569,20 +2578,33 @@ function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string
     memo = args[5];
   }
 
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
   const options: TokenTransferOptions = {
+    recipient: recipientAddress,
+    amount: tokenAmount,
+    senderKey: privateKey,
+    fee,
     nonce,
     memo,
-    version: network.isMainnet() ? TransactionVersion.Mainnet : TransactionVersion.Testnet,
-    chainId: TransactionVersion.Testnet ? 0x80000000 : 0x00000000
-  };
+    network: txNetwork
+  }
 
-  const tx = makeSTXTokenTransfer(recipientAddress, tokenAmount, feeRate, privateKey, options);
+  const tx = await makeSTXTokenTransfer(options);
+
+  if (estimateOnly) {
+    return estimateTransfer(tx, txNetwork).then((cost) => {
+      return cost.toString(10)
+    })
+  }
 
   if (txOnly) {
     return Promise.resolve(tx.serialize().toString('hex'));
   }
 
-  return tx.broadcast(defaultV2BroadcastUrl).then(() => {
+  return broadcastTransaction(tx, txNetwork).then(() => {
     return tx.txid();
   }).catch((error) => {
     return error.toString();
@@ -3424,7 +3446,6 @@ export function CLIMain() {
     const magicBytes = CLIOptAsString(opts, 'm');
     const apiUrl = CLIOptAsString(opts, 'H');
     const transactionBroadcasterUrl = CLIOptAsString(opts, 'T');
-    defaultV2BroadcastUrl = opts['T'] ? CLIOptAsString(opts, 'T') : defaultV2BroadcastUrl;
     const nodeAPIUrl = CLIOptAsString(opts, 'I');
     const utxoUrl = CLIOptAsString(opts, 'X');
     const bitcoindUsername = CLIOptAsString(opts, 'u');
@@ -3446,6 +3467,7 @@ export function CLIMain() {
     const networkType = testnet ? 'testnet' : (integration_test ? 'regtest' : 'mainnet');
 
     const configData = loadConfig(configPath, networkType);
+
     if (debug) {
       configData.logConfig.level = 'debug';
     }
