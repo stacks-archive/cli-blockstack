@@ -24,7 +24,7 @@ import { BIP32Interface } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
 export const STX_WALLET_COMPATIBLE_SEED_STRENGTH = 256;
-export const DERIVATION_PATH = `m/44'/5757'/0'/0/0`;
+export const DERIVATION_PATH = 'm/44\'/5757\'/0\'/0/0';
 
 export type OwnerKeyInfoType = {
   privateKey: string;
@@ -45,8 +45,9 @@ export type PaymentKeyInfoType = {
 export type StacksKeyInfoType = {
   privateKey: string;
   address: string;
+  btcAddress: string;
   index: number;
-}
+};
 
 export type AppKeyInfoType = {
   keyInfo: {
@@ -132,16 +133,26 @@ export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : s
  *    .address (string) the address of the private key
  */
 export async function getStacksWalletKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<StacksKeyInfoType> {
-  const seed = await bip39.mnemonicToSeed(mnemonic)
-  const master = bip32.fromSeed(seed)
-  const child = master.derivePath(`m/44'/5757'/0'/0/0`)     // taken from stacks-wallet. See https://github.com/blockstack/stacks-wallet
-  const ecPair = bitcoin.ECPair.fromPrivateKey(child.privateKey)
-  const privkey = blockstack.ecPairToHexString(ecPair)
+  const seed = await bip39.mnemonicToSeed(mnemonic);
+  const master = bip32.fromSeed(seed);
+  const child = master.derivePath('m/44\'/5757\'/0\'/0/0');     // taken from stacks-wallet. See https://github.com/blockstack/stacks-wallet
+  const ecPair = bitcoin.ECPair.fromPrivateKey(child.privateKey);
+  const privkey = blockstack.ecPairToHexString(ecPair);
   
   const addr = getPrivateKeyAddress(network, privkey);
+  let btcAddress: string;
+  if (network.isTestnet()) {
+    // btcAddress = const { address } = bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey });
+    const { address } = bitcoin.payments.p2pkh({ pubkey: ecPair.publicKey, network: bitcoin.networks.regtest });
+    btcAddress = address;
+  } else {
+    const { address } = bitcoin.payments.p2pkh({ pubkey: ecPair.publicKey, network: bitcoin.networks.bitcoin });
+    btcAddress = address;
+  }
   const result: StacksKeyInfoType = {
     privateKey: privkey,
     address: c32check.b58ToC32(addr),
+    btcAddress,
     index: 0
   };
   return result;
