@@ -14,11 +14,17 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import { 
   makeSTXTokenTransfer,
+  makeSmartContractDeploy,
+  makeContractCall,
   broadcastTransaction,
   estimateTransfer,
+  estimateContractDeploy,
+  estimateContractFunctionCall,
   StacksMainnet,
   StacksTestnet,
-  TokenTransferOptions
+  TokenTransferOptions,
+  ContractDeployOptions,
+  ContractCallOptions
 } from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
@@ -2612,6 +2618,56 @@ async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<
 }
 
 /*
+ * Depoly a Clarity smart contract.
+ * args:
+ * @source (string) path to the contract source file
+ * @contractName (string) the name of the contract
+ * @fee (int) the transaction fee to be paid
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
+ * @privateKey (string) the hex-encoded private key to use to send the tokens
+ */
+async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const sourceFile = args[0];
+  const contractName = args[1];
+  const fee = new BN(args[2]);
+  const nonce = new BN(args[3]);
+  const privateKey = args[4];
+
+  const source = fs.readFileSync(sourceFile).toString();
+
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  const options: ContractDeployOptions = {
+    contractName,
+    codeBody: source,
+    senderKey: privateKey,
+    fee,
+    nonce,
+    network: txNetwork
+  }
+
+  const tx = await makeSmartContractDeploy(options);
+
+  if (estimateOnly) {
+    return estimateContractDeploy(tx, txNetwork).then((cost) => {
+      return cost.toString(10)
+    })
+  }
+
+  if (txOnly) {
+    return Promise.resolve(tx.serialize().toString('hex'));
+  }
+
+  return broadcastTransaction(tx, txNetwork).then(() => {
+    return tx.txid();
+  }).catch((error) => {
+    return error.toString();
+  });
+}
+
+/*
  * Get the number of confirmations of a txid.
  * args:
  * @txid (string) the transaction ID as a hex string
@@ -3354,6 +3410,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'balance': balance,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
+  'deploy_contract': contractDeploy,
   'docs': printDocs,
   'encrypt_keychain': encryptMnemonic,
   'gaia_deletefile': gaiaDeleteFile,

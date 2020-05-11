@@ -319,6 +319,53 @@ export const CLI_ARGS = {
       '    section amount spend resemble spray verify night immune tattoo best emotion parrot',
       group: 'Key Management'
     },
+    deploy_contract: {
+      type: 'array',
+      items: [
+        {
+          name: 'source_file',
+          type: 'string',
+          realtype: 'path',
+          pattern: '.+'
+        },
+        {
+          name: 'contract_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+        },
+        {
+          name: 'fee',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'nonce',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'payment_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+        }
+      ],
+      minItems: 5,
+      maxItems: 5,
+      help: 'Deploys a Clarity smart contract on the network.\n' +
+      '\n' +
+      'If the command succeeds, it prints out a transaction ID.' +
+      '\n' +
+      'Example:\n' +
+      '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
+      '    $ blockstack-cli deploy_contract ./my_contract.clar my_contract 1 0 "$PAYMENT"\n' +
+      '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
+      '\n',
+      group: 'Account Management'
+    },
     docs: {
       type: 'array',
       items: [
