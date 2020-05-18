@@ -6,6 +6,26 @@ import * as stream from 'stream';
 import * as fs from 'fs';
 import * as blockstack from 'blockstack';
 import { decodeToken, SECP256K1Client, TokenSigner, TokenVerifier } from 'jsontokens'
+import { 
+  ClarityAbi,
+  getTypeUnion,
+  getTypeString,
+  ClarityAbiType,
+  isClarityAbiPrimitive,
+  isClarityAbiBuffer,
+  isClarityAbiResponse,
+  isClarityAbiOptional,
+  isClarityAbiTuple,
+  isClarityAbiList,
+  ClarityValue,
+  intCV,
+  uintCV,
+  bufferCVFromString,
+  trueCV,
+  falseCV,
+  standardPrincipalCV,
+  contractPrincipalCV,
+} from '@blockstack/stacks-transactions';
 
 const ZoneFile = require('zone-file');
 
@@ -736,3 +756,115 @@ export async function getIDAppKeys(network: CLINetworkAdapter,
   return ret;
 }
 
+interface InquirerPrompt {
+  type: string;
+  name: string;
+  message: string;
+  choices?: string[];
+}
+
+export function makePromptsFromArgList(expectedArgs: ClarityFunctionArg[]): InquirerPrompt[] {
+  const prompts = [];
+  for (let i = 0; i < expectedArgs.length; i++) {
+    prompts.push(argToPrompt(expectedArgs[i]));
+  }
+  return prompts;
+}
+
+export interface ClarityFunctionArg {
+  name: string;
+  type: ClarityAbiType;
+}
+
+export function argToPrompt(arg: ClarityFunctionArg): InquirerPrompt {
+  const name = arg.name;
+  const type = arg.type;
+  const typeString = getTypeString(type);
+  if (isClarityAbiPrimitive(type)) {
+    if (type === 'uint128') {
+      return {
+        type: 'input',
+        name,
+        message: `Enter value for function argument "${name}" of type ${typeString}`
+      }
+    } else if (type === 'int128') {
+      return {
+        type: 'input',
+        name,
+        message: `Enter value for function argument "${name}" of type ${typeString}`
+      }
+    } else if (type === 'bool') {
+      return {
+        type: 'list',
+        name,
+        message: `Enter value for function argument "${name}" of type ${typeString}`,
+        choices: ['True', 'False']
+      }
+    } else if (type === 'principal') {
+      return {
+        type: 'input',
+        name,
+        message: `Enter value for function argument "${name}" of type ${typeString}`
+      }
+    } else {
+      throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+    }
+  } else if (isClarityAbiBuffer(type)) {
+    return {
+      type: 'input',
+      name,
+      message: `Enter value for function argument "${name}" of type ${typeString}`
+    }
+  } else if (isClarityAbiResponse(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiOptional(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiTuple(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiList(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  }
+}
+
+export function parseClarityFunctionArgAnswers(answers: any, expectedArgs: ClarityFunctionArg[]): ClarityValue[] {
+  const functionArgs: ClarityValue[] = [];
+  for (let i = 0; i < expectedArgs.length; i++) {
+    const expectedArg = expectedArgs[i];
+    const answer = answers[expectedArg.name];
+    functionArgs.push(answerToClarityValue(answer, expectedArg));
+  }
+  return functionArgs;
+}
+
+export function answerToClarityValue(answer: any, arg: ClarityFunctionArg): ClarityValue {
+  const type = arg.type;
+  const typeString = getTypeString(type);
+  if (isClarityAbiPrimitive(type)) {
+    if (type === 'uint128') {
+      return uintCV(answer);
+    } else if (type === 'int128') {
+      return intCV(answer);
+    } else if (type === 'bool') {
+      return answer == 'True' ? trueCV() : falseCV();
+    } else if (type === 'principal') {
+      // TODO handle contract principals
+      return standardPrincipalCV(answer);
+    } else {
+      throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+    }
+  } else if (isClarityAbiBuffer(type)) {
+    return bufferCVFromString(answer);
+  } else if (isClarityAbiResponse(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiOptional(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiTuple(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else if (isClarityAbiList(type)) {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  } else {
+    throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  }
+}

@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
+import * as inquirer from 'inquirer';
 import fetch from 'node-fetch';
 import { 
   makeSTXTokenTransfer,
@@ -24,7 +25,12 @@ import {
   StacksTestnet,
   TokenTransferOptions,
   ContractDeployOptions,
-  ContractCallOptions
+  ContractCallOptions,
+  ContractCallPayload,
+  ClarityValue,
+  ClarityAbi,
+  getAbi,
+  validateContractCall
 } from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
@@ -111,7 +117,10 @@ import {
   getIDAppKeys,
   hasKeys,
   UTXO,
-  makeDIDConfiguration
+  makeDIDConfiguration,
+  makePromptsFromArgList,
+  parseClarityFunctionArgAnswers,
+  ClarityFunctionArg
 } from './utils';
 
 import {
@@ -2668,6 +2677,84 @@ async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Prom
 }
 
 /*
+ * Call a Clarity smart contract function.
+ * args:
+ * @source (string) path to the contract source file
+ * @contractName (string) the name of the contract
+ * @fee (int) the transaction fee to be paid
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
+ * @privateKey (string) the hex-encoded private key to use to send the tokens
+ */
+async function contractFunctionCall(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const contractAddress = args[0];
+  const contractName = args[1];
+  const functionName = args[2];
+  const fee = new BN(args[3]);
+  const nonce = new BN(args[4]);
+  const privateKey = args[5];
+
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  let abi: ClarityAbi;
+  let abiArgs: ClarityFunctionArg[];
+  let functionArgs: ClarityValue[] = [];
+
+  return getAbi(
+    contractAddress,
+    contractName,
+    txNetwork
+  ).then((responseAbi) => {
+    abi = responseAbi;
+    const filtered = abi.functions.filter(fn => fn.name === functionName);
+    if (filtered.length === 1) {
+      abiArgs = filtered[0].args;
+      return makePromptsFromArgList(abiArgs);
+    } else {
+      return null;
+    }
+  })
+  .then((prompts) => inquirer.prompt(prompts))
+  .then((answers) => {
+    functionArgs = parseClarityFunctionArgAnswers(answers, abiArgs);
+
+    const options: ContractCallOptions = {
+      contractAddress,
+      contractName,
+      functionName,
+      functionArgs,
+      senderKey: privateKey,
+      fee,
+      nonce,
+      network: txNetwork
+    }
+
+    return makeContractCall(options);
+  }).then((tx) => {
+    if (!validateContractCall(tx.payload as ContractCallPayload, abi)) {
+      throw new Error('Failed to validate function arguments against ABI');
+    }
+
+    if (estimateOnly) {
+      return estimateContractFunctionCall(tx, txNetwork).then((cost) => {
+        return cost.toString(10)
+      })
+    }
+
+    if (txOnly) {
+      return Promise.resolve(tx.serialize().toString('hex'));
+    }
+
+    return broadcastTransaction(tx, txNetwork).then(() => {
+      return tx.txid();
+    }).catch((error) => {
+      return error.toString();
+    });
+  });
+}
+
+/*
  * Get the number of confirmations of a txid.
  * args:
  * @txid (string) the transaction ID as a hex string
@@ -3408,6 +3495,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'authenticator': authDaemon,
   'announce': announce,
   'balance': balance,
+  'call_contract_func': contractFunctionCall,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
   'deploy_contract': contractDeploy,

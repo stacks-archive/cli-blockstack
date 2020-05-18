@@ -24,6 +24,7 @@
   },
   "license": "MIT",
   "bin": {
+    "blockstack": "./cmd/index.js",
     "blockstack-cli": "./cmd/index.js"
   },
   "bugs": {
@@ -63,11 +64,12 @@
     }
   ],
   "devDependencies": {
+    "@types/inquirer": "^6.5.0",
     "@typescript-eslint/eslint-plugin": "^2.0.0",
     "@typescript-eslint/parser": "^2.0.0",
     "eslint": "^6.1.0",
-    "ts-node": "^8.3.0",
     "minimist": ">=1.2.3",
+    "ts-node": "^8.3.0",
     "typescript": "^3.6.3"
   },
   "dependencies": {
@@ -88,6 +90,7 @@
     "cors": "^2.8.4",
     "express": "^4.16.0",
     "express-winston": "^3.1.0",
+    "inquirer": "^7.1.0",
     "jsontokens": "^2.0.2",
     "node-fetch": "^2.6.0",
     "ripemd160": "^2.0.1",
