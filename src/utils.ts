@@ -7,8 +7,6 @@ import * as fs from 'fs';
 import * as blockstack from 'blockstack';
 import { decodeToken, SECP256K1Client, TokenSigner, TokenVerifier } from 'jsontokens'
 import { 
-  ClarityAbi,
-  getTypeUnion,
   getTypeString,
   ClarityAbiType,
   isClarityAbiPrimitive,
@@ -24,7 +22,8 @@ import {
   trueCV,
   falseCV,
   standardPrincipalCV,
-  contractPrincipalCV,
+  StacksNetwork,
+  TransactionVersion,
 } from '@blockstack/stacks-transactions';
 
 const ZoneFile = require('zone-file');
@@ -866,5 +865,13 @@ export function answerToClarityValue(answer: any, arg: ClarityFunctionArg): Clar
     throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
   } else {
     throw new Error(`Contract function contains unsupported Clarity ABI type: ${typeString}`);
+  }
+}
+
+export function generateExplorerTxPageUrl(txid: string, network: StacksNetwork): string {
+  if (network.version === TransactionVersion.Mainnet) {
+    return `https://explorer.blockstack.org/txid/0x${txid}`;
+  } else if (network.version === TransactionVersion.Testnet) {
+    return `https://testnet-explorer.now.sh/txid/0x${txid}`;
   }
 }

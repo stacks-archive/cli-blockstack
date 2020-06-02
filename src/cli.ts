@@ -30,7 +30,8 @@ import {
   ClarityValue,
   ClarityAbi,
   getAbi,
-  validateContractCall
+  validateContractCall,
+  PostConditionMode
 } from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
@@ -120,7 +121,8 @@ import {
   makeDIDConfiguration,
   makePromptsFromArgList,
   parseClarityFunctionArgAnswers,
-  ClarityFunctionArg
+  ClarityFunctionArg,
+  generateExplorerTxPageUrl
 } from './utils';
 
 import {
@@ -2620,7 +2622,10 @@ async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<
   }
 
   return broadcastTransaction(tx, txNetwork).then(() => {
-    return tx.txid();
+    return {
+      txid: tx.txid(),
+      transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+    };
   }).catch((error) => {
     return error.toString();
   });
@@ -2654,7 +2659,8 @@ async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Prom
     senderKey: privateKey,
     fee,
     nonce,
-    network: txNetwork
+    network: txNetwork,
+    postConditionMode: PostConditionMode.Allow
   }
 
   const tx = await makeSmartContractDeploy(options);
@@ -2670,7 +2676,10 @@ async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Prom
   }
 
   return broadcastTransaction(tx, txNetwork).then(() => {
-    return tx.txid();
+    return {
+      txid: tx.txid(),
+      transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+    };
   }).catch((error) => {
     return error.toString();
   });
@@ -2727,7 +2736,8 @@ async function contractFunctionCall(network: CLINetworkAdapter, args: string[]) 
       senderKey: privateKey,
       fee,
       nonce,
-      network: txNetwork
+      network: txNetwork,
+      postConditionMode: PostConditionMode.Allow
     }
 
     return makeContractCall(options);
@@ -2747,7 +2757,10 @@ async function contractFunctionCall(network: CLINetworkAdapter, args: string[]) 
     }
 
     return broadcastTransaction(tx, txNetwork).then(() => {
-      return tx.txid();
+      return {
+        txid: tx.txid(),
+        transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+      };
     }).catch((error) => {
       return error.toString();
     });
