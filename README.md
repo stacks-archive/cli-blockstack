@@ -1,3 +1,5 @@
+## This is the legacy version of the Blockstack CLI that supports Stacks blockchain 1.0 transactions only. A new branch with support for Stacks blockchain 2.0 is being worked on here: https://github.com/blockstack/cli-blockstack/pull/40
+
 ## Intended Audience
 
 This tool is meant for **developers only**
