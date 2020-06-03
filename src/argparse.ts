@@ -106,7 +106,7 @@ const CONFIG_REGTEST_DEFAULTS : CLI_CONFIG_TYPE = {
   bitcoindUsername: 'blockstack'
 };
 
-const PUBLIC_TESTNET_HOST = 'neon.blockstack.org';
+const PUBLIC_TESTNET_HOST = 'testnet-master.blockstack.org';
 
 const CONFIG_TESTNET_DEFAULTS = {
   blockstackAPIUrl: `http://${PUBLIC_TESTNET_HOST}:20443`,
