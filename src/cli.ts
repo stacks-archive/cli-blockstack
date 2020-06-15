@@ -17,6 +17,7 @@ import {
   makeSTXTokenTransfer,
   makeSmartContractDeploy,
   makeContractCall,
+  callReadOnlyFunction,
   broadcastTransaction,
   estimateTransfer,
   estimateContractDeploy,
@@ -26,12 +27,14 @@ import {
   TokenTransferOptions,
   ContractDeployOptions,
   ContractCallOptions,
+  ReadOnlyFunctionOptions,
   ContractCallPayload,
   ClarityValue,
   ClarityAbi,
   getAbi,
   validateContractCall,
-  PostConditionMode
+  PostConditionMode,
+  cvToString,
 } from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
@@ -2621,7 +2624,7 @@ async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<
     return Promise.resolve(tx.serialize().toString('hex'));
   }
 
-  return broadcastTransaction(tx, txNetwork).then(() => {
+  return broadcastTransaction(tx, txNetwork).then((response) => {
     return {
       txid: tx.txid(),
       transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
@@ -2688,8 +2691,9 @@ async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Prom
 /*
  * Call a Clarity smart contract function.
  * args:
- * @source (string) path to the contract source file
+ * @contractAddress (string) the address of the contract
  * @contractName (string) the name of the contract
+ * @functionName (string) the name of the function to call
  * @fee (int) the transaction fee to be paid
  * @nonce (int) integer nonce needs to be incremented after each transaction from an account
  * @privateKey (string) the hex-encoded private key to use to send the tokens
@@ -2764,6 +2768,63 @@ async function contractFunctionCall(network: CLINetworkAdapter, args: string[]) 
     }).catch((error) => {
       return error.toString();
     });
+  });
+}
+
+/*
+ * Call a read-only Clarity smart contract function.
+ * args:
+ * @contractAddress (string) the address of the contract
+ * @contractName (string) the name of the contract
+ * @functionName (string) the name of the function to call
+ * @senderAddress (string) the sender address
+ */
+async function readOnlyContractFunctionCall(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const contractAddress = args[0];
+  const contractName = args[1];
+  const functionName = args[2];
+  const senderAddress = args[3];
+
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  let abi: ClarityAbi;
+  let abiArgs: ClarityFunctionArg[];
+  let functionArgs: ClarityValue[] = [];
+
+  return getAbi(
+    contractAddress,
+    contractName,
+    txNetwork
+  ).then((responseAbi) => {
+    abi = responseAbi;
+    const filtered = abi.functions.filter(fn => fn.name === functionName);
+    if (filtered.length === 1) {
+      abiArgs = filtered[0].args;
+      return makePromptsFromArgList(abiArgs);
+    } else {
+      return null;
+    }
+  })
+  .then((prompts) => inquirer.prompt(prompts))
+  .then((answers) => {
+    functionArgs = parseClarityFunctionArgAnswers(answers, abiArgs);
+
+    const options: ReadOnlyFunctionOptions = {
+      contractAddress,
+      contractName,
+      functionName,
+      functionArgs,
+      senderAddress,
+      network: txNetwork,
+    }
+
+    return callReadOnlyFunction(options);
+  }).then((returnValue) => {
+    return cvToString(returnValue);
+  }).catch((error) => {
+    return error.toString();
   });
 }
 
@@ -3509,6 +3570,7 @@ const COMMANDS : Record<string, CommandFunction> = {
   'announce': announce,
   'balance': balance,
   'call_contract_func': contractFunctionCall,
+  'call_read_only_contract_func': readOnlyContractFunctionCall,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
   'deploy_contract': contractDeploy,

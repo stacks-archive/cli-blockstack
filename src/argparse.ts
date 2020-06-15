@@ -281,7 +281,7 @@ export const CLI_ARGS = {
           name: 'function_name',
           type: 'string',
           realtype: 'string',
-          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_!?])*$',
         },
         {
           name: 'fee',
@@ -304,14 +304,55 @@ export const CLI_ARGS = {
       ],
       minItems: 6,
       maxItems: 6,
-      help: 'Deploys a Clarity smart contract on the network.\n' +
+      help: 'Call a function in a deployed Clarity smart contract.\n' +
       '\n' +
       'If the command succeeds, it prints out a transaction ID.' +
       '\n' +
       'Example:\n' +
       '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
-      '    $ blockstack-cli deploy_contract ./my_contract.clar my_contract 1 0 "$PAYMENT"\n' +
+      '    $ blockstack-cli call_contract_func SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X contract_name' + 
+      '      contract_function 1 0 "$PAYMENT"\n' +
       '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
+      '\n',
+      group: 'Account Management'
+    },
+    call_read_only_contract_func: {
+      type: 'array',
+      items: [
+        {
+          name: 'contract_address',
+          type: 'string',
+          realtype: 'address',
+          pattern: `${STACKS_ADDRESS_PATTERN}`
+        },
+        {
+          name: 'contract_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+        },
+        {
+          name: 'function_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_!?])*$',
+        },
+        {
+          name: 'sender_address',
+          type: 'string',
+          realtype: 'address',
+          pattern: `${STACKS_ADDRESS_PATTERN}`
+        }
+      ],
+      minItems: 4,
+      maxItems: 4,
+      help: 'Call a read-only function in a deployed Clarity smart contract.\n' +
+      '\n' +
+      'If the command succeeds, it prints out a Clarity value.' +
+      '\n' +
+      'Example:\n' +
+      '    $ blockstack-cli call_read_only_contract_func SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X contract_name' + 
+      '     contract_function SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X\n' +
       '\n',
       group: 'Account Management'
     },
