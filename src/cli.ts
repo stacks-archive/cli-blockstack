@@ -15,7 +15,7 @@ import * as inquirer from 'inquirer';
 import fetch from 'node-fetch';
 import { 
   makeSTXTokenTransfer,
-  makeSmartContractDeploy,
+  makeContractDeploy,
   makeContractCall,
   callReadOnlyFunction,
   broadcastTransaction,
@@ -2666,7 +2666,7 @@ async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Prom
     postConditionMode: PostConditionMode.Allow
   }
 
-  const tx = await makeSmartContractDeploy(options);
+  const tx = await makeContractDeploy(options);
 
   if (estimateOnly) {
     return estimateContractDeploy(tx, txNetwork).then((cost) => {
