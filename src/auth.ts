@@ -377,7 +377,7 @@ export async function handleAuth(network: CLINetworkAdapter,
   res: express.Response
 ) : Promise<any> {
 
-  const authToken = req.query.authRequest;
+  const authToken = req.query.authRequest as string;
   if (!authToken) {
     return Promise.resolve().then(() => {
       sendJSON(res, { error: 'No authRequest given' }, 400);
@@ -589,7 +589,7 @@ export async function handleSignIn(network: CLINetworkAdapter,
   res: express.Response
 ): Promise<any> {
   
-  const authResponseQP = req.query.authResponse;
+  const authResponseQP = req.query.authResponse as string;
   if (!authResponseQP) {
     return Promise.resolve().then(() => {
       sendJSON(res, { error: 'No authResponse given' }, 400);

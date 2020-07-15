@@ -371,9 +371,13 @@ export function decodePrivateKey(serializedPrivateKey: string) : string | CLITra
   throw new Error('Unparseable private key');
 }
 
-type AnyJson = boolean | number | string | null | JsonArray | JsonMap;
-interface JsonMap { [key: string]: AnyJson; }
-interface JsonArray extends Array<AnyJson> {}
+type AnyJson =
+    | string
+    | number
+    | boolean
+    | null
+    | { [property: string]: AnyJson }
+    | AnyJson[];
 
 /*
  * JSON stringify helper
@@ -471,7 +475,7 @@ export function makeProfileJWT(profileData: Object, privateKey: string) : string
   const signedToken = blockstack.signProfileToken(profileData, privateKey);
   const wrappedToken = blockstack.wrapProfileToken(signedToken);
   const tokenRecords = [wrappedToken];
-  return JSONStringify(tokenRecords);
+  return JSONStringify(tokenRecords as unknown as AnyJson);
 }
 
 export async function makeDIDConfiguration(network:CLINetworkAdapter, blockstackID: string, domain: string, privateKey:string): Promise<{entries:{did:string, jwt:string}[]}> {
