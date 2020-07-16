@@ -24,8 +24,8 @@
   },
   "license": "MIT",
   "bin": {
-    "blockstack": "./cmd/index.js",
-    "blockstack-cli": "./cmd/index.js"
+    "blockstack": "./bin.js",
+    "blockstack-cli": "./bin.js"
   },
   "bugs": {
     "url": "https://github.com/blockstack/cli-blockstack/issues"
@@ -68,9 +68,7 @@
     "@typescript-eslint/eslint-plugin": "^2.0.0",
     "@typescript-eslint/parser": "^2.0.0",
     "eslint": "^6.1.0",
-    "minimist": ">=1.2.3",
-    "ts-node": "^8.3.0",
-    "typescript": "^3.6.3"
+    "minimist": ">=1.2.3"
   },
   "dependencies": {
     "@blockstack/stacks-transactions": "^0.5.0-beta.1",
@@ -94,6 +92,8 @@
     "jsontokens": "^2.0.2",
     "node-fetch": "^2.6.0",
     "ripemd160": "^2.0.1",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.6",
     "winston": "^3.2.1",
     "zone-file": "^0.2.2"
   }
