@@ -23,6 +23,8 @@ import * as bip32 from 'bip32';
 import { BIP32Interface } from 'bip32';
 
 export const STRENGTH = 128;   // 12 words
+export const STX_WALLET_COMPATIBLE_SEED_STRENGTH = 256;
+export const DERIVATION_PATH = 'm/44\'/5757\'/0\'/0/0';
 
 export type OwnerKeyInfoType = {
   privateKey: string;
@@ -38,6 +40,13 @@ export type PaymentKeyInfoType = {
     STACKS: string;
   };
   index: number
+};
+
+export type StacksKeyInfoType = {
+  privateKey: string;
+  address: string;
+  btcAddress: string;
+  index: number;
 };
 
 export type AppKeyInfoType = {
@@ -123,20 +132,27 @@ export async function getPaymentKeyInfo(network: CLINetworkAdapter, mnemonic : s
  *    .privateKey (string) the hex private key
  *    .address (string) the address of the private key
  */
-export async function getStacksWalletKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<PaymentKeyInfoType> {
-  const seed = await bip39.mnemonicToSeed(mnemonic)
-  const master = bip32.fromSeed(seed)
-  const child = master.derivePath(`m/44'/5757'/0'/0/0`)     // taken from stacks-wallet. See https://github.com/blockstack/stacks-wallet
-  const ecPair = bitcoin.ECPair.fromPrivateKey(child.privateKey)
-  const privkey = blockstack.ecPairToHexString(ecPair)
+export async function getStacksWalletKeyInfo(network: CLINetworkAdapter, mnemonic : string): Promise<StacksKeyInfoType> {
+  const seed = await bip39.mnemonicToSeed(mnemonic);
+  const master = bip32.fromSeed(seed);
+  const child = master.derivePath('m/44\'/5757\'/0\'/0/0');     // taken from stacks-wallet. See https://github.com/blockstack/stacks-wallet
+  const ecPair = bitcoin.ECPair.fromPrivateKey(child.privateKey);
+  const privkey = blockstack.ecPairToHexString(ecPair);
   
   const addr = getPrivateKeyAddress(network, privkey);
-  const result: PaymentKeyInfoType = {
+  let btcAddress: string;
+  if (network.isTestnet()) {
+    // btcAddress = const { address } = bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey });
+    const { address } = bitcoin.payments.p2pkh({ pubkey: ecPair.publicKey, network: bitcoin.networks.regtest });
+    btcAddress = address;
+  } else {
+    const { address } = bitcoin.payments.p2pkh({ pubkey: ecPair.publicKey, network: bitcoin.networks.bitcoin });
+    btcAddress = address;
+  }
+  const result: StacksKeyInfoType = {
     privateKey: privkey,
-    address: {
-      BTC: addr,
-      STACKS: c32check.b58ToC32(addr)
-    },
+    address: c32check.b58ToC32(addr),
+    btcAddress,
     index: 0
   };
   return result;

@@ -11,7 +11,31 @@ import * as crypto from 'crypto';
 import * as bip39 from 'bip39';
 import * as express from 'express';
 import * as path from 'path';
+import * as inquirer from 'inquirer';
 import fetch from 'node-fetch';
+import { 
+  makeSTXTokenTransfer,
+  makeContractDeploy,
+  makeContractCall,
+  callReadOnlyFunction,
+  broadcastTransaction,
+  estimateTransfer,
+  estimateContractDeploy,
+  estimateContractFunctionCall,
+  StacksMainnet,
+  StacksTestnet,
+  TokenTransferOptions,
+  ContractDeployOptions,
+  ContractCallOptions,
+  ReadOnlyFunctionOptions,
+  ContractCallPayload,
+  ClarityValue,
+  ClarityAbi,
+  getAbi,
+  validateContractCall,
+  PostConditionMode,
+  cvToString,
+} from '@blockstack/stacks-transactions';
 
 const c32check = require('c32check');
 
@@ -30,8 +54,10 @@ import {
   getApplicationKeyInfo,
   extractAppKey,
   STRENGTH,
+  STX_WALLET_COMPATIBLE_SEED_STRENGTH,
   PaymentKeyInfoType,
-  OwnerKeyInfoType
+  OwnerKeyInfoType,
+  StacksKeyInfoType
 } from './keys';
 
 import {
@@ -95,7 +121,11 @@ import {
   getIDAppKeys,
   hasKeys,
   UTXO,
-  makeDIDConfiguration
+  makeDIDConfiguration,
+  makePromptsFromArgList,
+  parseClarityFunctionArgAnswers,
+  ClarityFunctionArg,
+  generateExplorerTxPageUrl
 } from './utils';
 
 import {
@@ -1808,18 +1838,18 @@ function register(network: CLINetworkAdapter, args: string[]) : Promise<string> 
     .then(([preorderSafetyChecks, registerSafetyChecks]) => {
       if (!checkTxStatus(preorderSafetyChecks) || !checkTxStatus(registerSafetyChecks)) {
         try {
-           preorderSafetyChecks = JSON.parse(preorderSafetyChecks);
+          preorderSafetyChecks = JSON.parse(preorderSafetyChecks);
         }
         catch (e) {
         }
 
         try {
-           registerSafetyChecks = JSON.parse(registerSafetyChecks);
+          registerSafetyChecks = JSON.parse(registerSafetyChecks);
         }
         catch (e) {
         }
 
-      // one or both safety checks failed 
+        // one or both safety checks failed 
         throw new SafetyError({
           'status': false,
           'error': 'Failed to generate one or more transactions',
@@ -2354,7 +2384,7 @@ async function getStacksWalletKey(network: CLINetworkAdapter, args: string[]) : 
   const mnemonic = await getBackupPhrase(args[0]);
   // keep the return value consistent with getOwnerKeys
   const keyObj = await getStacksWalletKeyInfo(network, mnemonic);
-  const keyInfo: PaymentKeyInfoType[] = [];
+  const keyInfo: StacksKeyInfoType[] = [];
   keyInfo.push(keyObj);
   return JSONStringify(keyInfo);
 }
@@ -2369,15 +2399,16 @@ async function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promis
   if (args[0]) {
     mnemonic = await getBackupPhrase(args[0]);
   } else {
-    mnemonic = await bip39.generateMnemonic(STRENGTH, crypto.randomBytes);
+    mnemonic = await bip39.generateMnemonic(
+      STX_WALLET_COMPATIBLE_SEED_STRENGTH, 
+      crypto.randomBytes
+    );
   }
 
-  const ownerKeyInfo = await getOwnerKeyInfo(network, mnemonic, 0);
-  const paymentKeyInfo = await getPaymentKeyInfo(network, mnemonic);
+  const stacksKeyInfo = await getStacksWalletKeyInfo(network, mnemonic);
   return JSONStringify({
     'mnemonic': mnemonic,
-    'ownerKeyInfo': ownerKeyInfo,
-    'paymentKeyInfo': paymentKeyInfo
+    'keyInfo': stacksKeyInfo
   });
 }
 
@@ -2389,57 +2420,29 @@ async function makeKeychain(network: CLINetworkAdapter, args: string[]) : Promis
  */
 function balance(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   let address = args[0];
-  if (address.match(STACKS_ADDRESS_PATTERN)) {
-    address = c32check.c32ToB58(address);
-  }
 
   if (BLOCKSTACK_TEST) {
     // force testnet address if we're in regtest or testnet mode
     address = network.coerceAddress(address);
   }
 
-  return Promise.resolve().then(() => {
-    return network.getAccountTokens(address);
-  })
-    .then((tokenList) => {
-      let tokenAndBTC = tokenList.tokens;
-      if (!tokenAndBTC) {
-        tokenAndBTC = [];
-      }
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
 
-      tokenAndBTC.push('BTC');
-
-      return Promise.all(tokenAndBTC.map((tokenType : string) => {
-        if (tokenType === 'BTC') {
-          return Promise.resolve().then(() => {
-            return network.getUTXOs(address);
-          })
-            .then((utxoList : UTXO[]) => {
-              return {
-                'token': 'BTC',
-                'amount': `${sumUTXOs(utxoList)}`
-              };
-            });
-        }
-        else {
-          return Promise.resolve().then(() => {
-            return network.getAccountBalance(address, tokenType);
-          })
-            .then((tokenBalance : import('bn.js')) => {
-              return {
-                'token': tokenType,
-                'amount': tokenBalance.toString()
-              };
-            });
-        }
-      }));
-    })
-    .then((tokenBalances : [{token: string, amount: string}]) => {
-      const ret : Record<string, string> = {};
-      for (const tokenInfo of tokenBalances) {
-        ret[tokenInfo.token] = tokenInfo.amount;
+  return fetch(txNetwork.getAccountApiUrl(address))
+    .then((response) => response.json())
+    .then((response) => {
+      let balanceHex = response.balance;
+      if(balanceHex.startsWith('0x')) {
+        balanceHex = balanceHex.substr(2);
       }
-      return JSONStringify(ret);
+      const balance = new BN(balanceHex, 16);
+      const res = {
+        balance: balance.toString(10),
+        nonce: response.nonce
+      };
+      return Promise.resolve(JSONStringify(res));
     });
 }
 
@@ -2576,104 +2579,253 @@ function sendBTC(network: CLINetworkAdapter, args: string[]) : Promise<string> {
  * Send tokens from one account private key to another account's address.
  * args:
  * @recipientAddress (string) the recipient's account address
- * @tokenType (string) the type of tokens to send
  * @tokenAmount (int) the number of tokens to send
+ * @fee (int) the transaction fee to be paid
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
  * @privateKey (string) the hex-encoded private key to use to send the tokens
- * @privateKeyBTC (string) the hex-encoded private key to use to fund the BTC fee
  * @memo (string) OPTIONAL: a 34-byte memo to include
  */
-function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
-  const recipientAddress = c32check.c32ToB58(args[0]);
-  const tokenType = args[1];
-  const tokenAmount = new BN(args[2]);
-  const privateKey = decodePrivateKey(args[3]);
-  const privateKeyBTC = decodePrivateKey(args[4]);
+async function sendTokens(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const recipientAddress = args[0];
+  const tokenAmount = new BN(args[1]);
+  const fee = new BN(args[2]);
+  const nonce = new BN(args[3]);
+  const privateKey = args[4];
+
   let memo = '';
 
   if (args.length > 4 && !!args[5]) {
     memo = args[5];
   }
 
-  const senderAddress = getPrivateKeyAddress(network, privateKey);
-  const senderUTXOsPromise = network.getUTXOs(senderAddress);
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
 
-  const txPromise = blockstack.transactions.makeTokenTransfer(
-    recipientAddress, tokenType, tokenAmount, memo, privateKey, privateKeyBTC, !hasKeys(privateKey));
+  const options: TokenTransferOptions = {
+    recipient: recipientAddress,
+    amount: tokenAmount,
+    senderKey: privateKey,
+    fee,
+    nonce,
+    memo,
+    network: txNetwork
+  }
 
-  const estimatePromise = senderUTXOsPromise.then((utxos) => {
-    const numUTXOs = utxos.length;
-    return blockstack.transactions.estimateTokenTransfer(
-      recipientAddress, tokenType, tokenAmount, memo, numUTXOs);
-  });
+  const tx = await makeSTXTokenTransfer(options);
 
   if (estimateOnly) {
-    return estimatePromise
-      .then((cost: number) => String(cost));
+    return estimateTransfer(tx, txNetwork).then((cost) => {
+      return cost.toString(10)
+    })
   }
 
-  if (!safetyChecks) {
-    if (txOnly) {
-      return txPromise;
-    }
-    else {
-      return txPromise.then((tx) => {
-        return network.broadcastTransaction(tx);
-      });
-    }
+  if (txOnly) {
+    return Promise.resolve(tx.serialize().toString('hex'));
   }
 
-  const btcBalancePromise = senderUTXOsPromise.then((utxos) => {
-    return sumUTXOs(utxos);
+  return broadcastTransaction(tx, txNetwork).then((response) => {
+    return {
+      txid: tx.txid(),
+      transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+    };
+  }).catch((error) => {
+    return error.toString();
   });
+}
 
-  const receiverIsDistinctPromise = Promise.resolve().then(() => {
-     return recipientAddress != senderAddress
+/*
+ * Depoly a Clarity smart contract.
+ * args:
+ * @source (string) path to the contract source file
+ * @contractName (string) the name of the contract
+ * @fee (int) the transaction fee to be paid
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
+ * @privateKey (string) the hex-encoded private key to use to send the tokens
+ */
+async function contractDeploy(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const sourceFile = args[0];
+  const contractName = args[1];
+  const fee = new BN(args[2]);
+  const nonce = new BN(args[3]);
+  const privateKey = args[4];
+
+  const source = fs.readFileSync(sourceFile).toString();
+
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  const options: ContractDeployOptions = {
+    contractName,
+    codeBody: source,
+    senderKey: privateKey,
+    fee,
+    nonce,
+    network: txNetwork,
+    postConditionMode: PostConditionMode.Allow
+  }
+
+  const tx = await makeContractDeploy(options);
+
+  if (estimateOnly) {
+    return estimateContractDeploy(tx, txNetwork).then((cost) => {
+      return cost.toString(10)
+    })
+  }
+
+  if (txOnly) {
+    return Promise.resolve(tx.serialize().toString('hex'));
+  }
+
+  return broadcastTransaction(tx, txNetwork).then(() => {
+    return {
+      txid: tx.txid(),
+      transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+    };
+  }).catch((error) => {
+    return error.toString();
   });
+}
 
-  const accountStatePromise = network.getAccountStatus(senderAddress, tokenType);
-  const tokenBalancePromise = network.getAccountBalance(senderAddress, tokenType);
-  const blockHeightPromise = network.getBlockHeight();
+/*
+ * Call a Clarity smart contract function.
+ * args:
+ * @contractAddress (string) the address of the contract
+ * @contractName (string) the name of the contract
+ * @functionName (string) the name of the function to call
+ * @fee (int) the transaction fee to be paid
+ * @nonce (int) integer nonce needs to be incremented after each transaction from an account
+ * @privateKey (string) the hex-encoded private key to use to send the tokens
+ */
+async function contractFunctionCall(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const contractAddress = args[0];
+  const contractName = args[1];
+  const functionName = args[2];
+  const fee = new BN(args[3]);
+  const nonce = new BN(args[4]);
+  const privateKey = args[5];
 
-  const safetyChecksPromise = Promise.all(
-    [tokenBalancePromise, estimatePromise, btcBalancePromise,
-      accountStatePromise, blockHeightPromise, receiverIsDistinctPromise])
-    .then(([tokenBalance, estimate, btcBalance, 
-      accountState, blockHeight, receiverIsDistinct]) => {
-      if (btcBalance >= estimate && tokenBalance.cmp(tokenAmount) >= 0 &&
-          accountState.lock_transfer_block_id <= blockHeight && receiverIsDistinct) {
-        return {'status': true};
-      }
-      else {
-        return {
-          'status': false,
-          'error': 'TokenTransfer cannot be safely sent',
-          'lockTransferBlockHeight': accountState.lock_transfer_block_id,
-          'senderBalanceBTC': btcBalance,
-          'estimateCostBTC': estimate,
-          'tokenBalance': tokenBalance.toString(),
-          'blockHeight': blockHeight,
-          'receiverIsDistinctFromSender': receiverIsDistinct
-        };
-      }
-    });
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
 
-  return safetyChecksPromise
-    .then((safetyChecksResult) => {
-      if (!safetyChecksResult.status) {
-        return new Promise((resolve) => resolve(JSONStringify(safetyChecksResult, true)));
-      }
-      
-      if (txOnly) {
-        return txPromise;
-      }
+  let abi: ClarityAbi;
+  let abiArgs: ClarityFunctionArg[];
+  let functionArgs: ClarityValue[] = [];
 
-      return txPromise.then((tx) => {
-        return network.broadcastTransaction(tx);
+  return getAbi(
+    contractAddress,
+    contractName,
+    txNetwork
+  ).then((responseAbi) => {
+    abi = responseAbi;
+    const filtered = abi.functions.filter(fn => fn.name === functionName);
+    if (filtered.length === 1) {
+      abiArgs = filtered[0].args;
+      return makePromptsFromArgList(abiArgs);
+    } else {
+      return null;
+    }
+  })
+  .then((prompts) => inquirer.prompt(prompts))
+  .then((answers) => {
+    functionArgs = parseClarityFunctionArgAnswers(answers, abiArgs);
+
+    const options: ContractCallOptions = {
+      contractAddress,
+      contractName,
+      functionName,
+      functionArgs,
+      senderKey: privateKey,
+      fee,
+      nonce,
+      network: txNetwork,
+      postConditionMode: PostConditionMode.Allow
+    }
+
+    return makeContractCall(options);
+  }).then((tx) => {
+    if (!validateContractCall(tx.payload as ContractCallPayload, abi)) {
+      throw new Error('Failed to validate function arguments against ABI');
+    }
+
+    if (estimateOnly) {
+      return estimateContractFunctionCall(tx, txNetwork).then((cost) => {
+        return cost.toString(10)
       })
-        .then((txidHex) => {
-          return txidHex;
-        });
+    }
+
+    if (txOnly) {
+      return Promise.resolve(tx.serialize().toString('hex'));
+    }
+
+    return broadcastTransaction(tx, txNetwork).then(() => {
+      return {
+        txid: tx.txid(),
+        transaction: generateExplorerTxPageUrl(tx.txid(), txNetwork),
+      };
+    }).catch((error) => {
+      return error.toString();
     });
+  });
+}
+
+/*
+ * Call a read-only Clarity smart contract function.
+ * args:
+ * @contractAddress (string) the address of the contract
+ * @contractName (string) the name of the contract
+ * @functionName (string) the name of the function to call
+ * @senderAddress (string) the sender address
+ */
+async function readOnlyContractFunctionCall(network: CLINetworkAdapter, args: string[]) : Promise<string> {
+  const contractAddress = args[0];
+  const contractName = args[1];
+  const functionName = args[2];
+  const senderAddress = args[3];
+
+  // temporary hack to use network config from stacks-transactions lib
+  const txNetwork = network.isMainnet() ? new StacksMainnet() : new StacksTestnet();
+  txNetwork.coreApiUrl = network.blockstackAPIUrl;
+
+  let abi: ClarityAbi;
+  let abiArgs: ClarityFunctionArg[];
+  let functionArgs: ClarityValue[] = [];
+
+  return getAbi(
+    contractAddress,
+    contractName,
+    txNetwork
+  ).then((responseAbi) => {
+    abi = responseAbi;
+    const filtered = abi.functions.filter(fn => fn.name === functionName);
+    if (filtered.length === 1) {
+      abiArgs = filtered[0].args;
+      return makePromptsFromArgList(abiArgs);
+    } else {
+      return null;
+    }
+  })
+  .then((prompts) => inquirer.prompt(prompts))
+  .then((answers) => {
+    functionArgs = parseClarityFunctionArgAnswers(answers, abiArgs);
+
+    const options: ReadOnlyFunctionOptions = {
+      contractAddress,
+      contractName,
+      functionName,
+      functionArgs,
+      senderAddress,
+      network: txNetwork,
+    }
+
+    return callReadOnlyFunction(options);
+  }).then((returnValue) => {
+    return cvToString(returnValue);
+  }).catch((error) => {
+    return error.toString();
+  });
 }
 
 /*
@@ -2722,8 +2874,8 @@ function getKeyAddress(network: CLINetworkAdapter, args: string[]) : Promise<str
 function getDidConfiguration(network: CLINetworkAdapter, args: string[]) : Promise<string> {
   const privateKey = decodePrivateKey(args[2]);
   return makeDIDConfiguration(network, args[0], args[1], args[2]).then(didConfiguration => {
-    return JSONStringify(didConfiguration)
-  })
+    return JSONStringify(didConfiguration);
+  });
 }
 
 /*
@@ -3417,8 +3569,11 @@ const COMMANDS : Record<string, CommandFunction> = {
   'authenticator': authDaemon,
   'announce': announce,
   'balance': balance,
+  'call_contract_func': contractFunctionCall,
+  'call_read_only_contract_func': readOnlyContractFunctionCall,
   'convert_address': addressConvert,
   'decrypt_keychain': decryptMnemonic,
+  'deploy_contract': contractDeploy,
   'docs': printDocs,
   'encrypt_keychain': encryptMnemonic,
   'gaia_deletefile': gaiaDeleteFile,
@@ -3513,6 +3668,8 @@ export function CLIMain() {
     const transactionBroadcasterUrl = CLIOptAsString(opts, 'T');
     const nodeAPIUrl = CLIOptAsString(opts, 'I');
     const utxoUrl = CLIOptAsString(opts, 'X');
+    const bitcoindUsername = CLIOptAsString(opts, 'u');
+    const bitcoindPassword = CLIOptAsString(opts, 'p');
 
     if (integration_test) {
       BLOCKSTACK_TEST = integration_test;
@@ -3530,15 +3687,22 @@ export function CLIMain() {
     const networkType = testnet ? 'testnet' : (integration_test ? 'regtest' : 'mainnet');
 
     const configData = loadConfig(configPath, networkType);
+
     if (debug) {
       configData.logConfig.level = 'debug';
     }
     else {
       configData.logConfig.level = 'info';
     }
+    if (bitcoindUsername) {
+      configData.bitcoindUsername = bitcoindUsername;
+    }
+    if (bitcoindPassword) {
+      configData.bitcoindPassword = bitcoindPassword;
+    }
 
     if (utxoUrl) {
-       configData.utxoServiceUrl = utxoUrl;
+      configData.utxoServiceUrl = utxoUrl;
     }
 
     winston.configure({ level: configData.logConfig.level, transports: [new winston.transports.Console(configData.logConfig)] });
@@ -3555,7 +3719,7 @@ export function CLIMain() {
       altTransactionBroadcasterUrl: (transactionBroadcasterUrl ? 
         transactionBroadcasterUrl : 
         configData.broadcastServiceUrl),
-      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl),
+      nodeAPIUrl: (nodeAPIUrl ? nodeAPIUrl : configData.blockstackNodeUrl)
     };
 
     // wrap command-line options

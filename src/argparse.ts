@@ -74,7 +74,9 @@ export interface CLI_CONFIG_TYPE {
   blockstackNodeUrl: string,
   broadcastServiceUrl: string,
   utxoServiceUrl: string,
-  logConfig: CLI_LOG_CONFIG_TYPE
+  logConfig: CLI_LOG_CONFIG_TYPE,
+  bitcoindUsername?: string,
+  bitcoindPassword?: string,
 };
 
 const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
@@ -87,9 +89,9 @@ const LOG_CONFIG_DEFAULTS : CLI_LOG_CONFIG_TYPE = {
 };
 
 const CONFIG_DEFAULTS : CLI_CONFIG_TYPE = {
-  blockstackAPIUrl: 'https://core.blockstack.org',
-  blockstackNodeUrl: 'https://node.blockstack.org:6263',
-  broadcastServiceUrl: 'https://broadcast.blockstack.org',
+  blockstackAPIUrl: 'http://core.blockstack.org:20443',
+  blockstackNodeUrl: 'http://core.blockstack.org:20443',
+  broadcastServiceUrl: 'http://core.blockstack.org:20443/v2/transactions',
   utxoServiceUrl: 'https://blockchain.info',
   logConfig: LOG_CONFIG_DEFAULTS
 };
@@ -99,15 +101,17 @@ const CONFIG_REGTEST_DEFAULTS : CLI_CONFIG_TYPE = {
   blockstackNodeUrl: 'http://localhost:16264',
   broadcastServiceUrl: 'http://localhost:16269',
   utxoServiceUrl: 'http://localhost:18332',
-  logConfig: LOG_CONFIG_DEFAULTS
+  logConfig: LOG_CONFIG_DEFAULTS,
+  bitcoindPassword: 'blockstacksystem',
+  bitcoindUsername: 'blockstack'
 };
 
-const PUBLIC_TESTNET_HOST = 'testnet.blockstack.org';
+const PUBLIC_TESTNET_HOST = 'testnet-master.blockstack.org';
 
 const CONFIG_TESTNET_DEFAULTS = {
-  blockstackAPIUrl: `http://${PUBLIC_TESTNET_HOST}:16268`,
-  blockstackNodeUrl: `http://${PUBLIC_TESTNET_HOST}:16264`,
-  broadcastServiceUrl: `http://${PUBLIC_TESTNET_HOST}:16269`,
+  blockstackAPIUrl: `http://${PUBLIC_TESTNET_HOST}:20443`,
+  blockstackNodeUrl: `http://${PUBLIC_TESTNET_HOST}:20443`,
+  broadcastServiceUrl: `http://${PUBLIC_TESTNET_HOST}:20443/v2/transactions`,
   utxoServiceUrl: `http://${PUBLIC_TESTNET_HOST}:18332`,
   logConfig: Object.assign({}, LOG_CONFIG_DEFAULTS, { level: 'debug' })
 };
@@ -258,6 +262,100 @@ export const CLI_ARGS = {
       '    }\n',
       group: 'Account Management'
     },
+    call_contract_func: {
+      type: 'array',
+      items: [
+        {
+          name: 'contract_address',
+          type: 'string',
+          realtype: 'address',
+          pattern: `${STACKS_ADDRESS_PATTERN}`
+        },
+        {
+          name: 'contract_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+        },
+        {
+          name: 'function_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_!?])*$',
+        },
+        {
+          name: 'fee',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'nonce',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'payment_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+        }
+      ],
+      minItems: 6,
+      maxItems: 6,
+      help: 'Call a function in a deployed Clarity smart contract.\n' +
+      '\n' +
+      'If the command succeeds, it prints out a transaction ID.' +
+      '\n' +
+      'Example:\n' +
+      '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
+      '    $ blockstack-cli call_contract_func SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X contract_name' + 
+      '      contract_function 1 0 "$PAYMENT"\n' +
+      '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
+      '\n',
+      group: 'Account Management'
+    },
+    call_read_only_contract_func: {
+      type: 'array',
+      items: [
+        {
+          name: 'contract_address',
+          type: 'string',
+          realtype: 'address',
+          pattern: `${STACKS_ADDRESS_PATTERN}`
+        },
+        {
+          name: 'contract_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+        },
+        {
+          name: 'function_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_!?])*$',
+        },
+        {
+          name: 'sender_address',
+          type: 'string',
+          realtype: 'address',
+          pattern: `${STACKS_ADDRESS_PATTERN}`
+        }
+      ],
+      minItems: 4,
+      maxItems: 4,
+      help: 'Call a read-only function in a deployed Clarity smart contract.\n' +
+      '\n' +
+      'If the command succeeds, it prints out a Clarity value.' +
+      '\n' +
+      'Example:\n' +
+      '    $ blockstack-cli call_read_only_contract_func SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X contract_name' + 
+      '     contract_function SPBMRFRPPGCDE3F384WCJPK8PQJGZ8K9QKK7F59X\n' +
+      '\n',
+      group: 'Account Management'
+    },
     convert_address: {
       type: 'array',
       items: [
@@ -314,6 +412,53 @@ export const CLI_ARGS = {
       '    Enter password:\n' +
       '    section amount spend resemble spray verify night immune tattoo best emotion parrot',
       group: 'Key Management'
+    },
+    deploy_contract: {
+      type: 'array',
+      items: [
+        {
+          name: 'source_file',
+          type: 'string',
+          realtype: 'path',
+          pattern: '.+'
+        },
+        {
+          name: 'contract_name',
+          type: 'string',
+          realtype: 'string',
+          pattern: '^[a-zA-Z]([a-zA-Z0-9]|[-_])*$',
+        },
+        {
+          name: 'fee',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'nonce',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'payment_key',
+          type: 'string',
+          realtype: 'private_key',
+          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+        }
+      ],
+      minItems: 5,
+      maxItems: 5,
+      help: 'Deploys a Clarity smart contract on the network.\n' +
+      '\n' +
+      'If the command succeeds, it prints out a transaction ID.' +
+      '\n' +
+      'Example:\n' +
+      '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
+      '    $ blockstack-cli deploy_contract ./my_contract.clar my_contract 1 0 "$PAYMENT"\n' +
+      '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
+      '\n',
+      group: 'Account Management'
     },
     docs: {
       type: 'array',
@@ -1224,17 +1369,8 @@ export const CLI_ARGS = {
       '    $ blockstack-cli make_keychain\n' +
       '    {\n' + 
       '      "mnemonic": "apart spin rich leader siren foil dish sausage fee pipe ethics bundle",\n' +
-      '      "ownerKeyInfo": {\n' +
-      '        "idAddress": "ID-192yxWSvZrss3f4ZY48tUMJJxQvuB6DcXE",\n' +
-      '        "index": 0,\n' +
-      '        "privateKey": "c0a1c606bf509059be1be27aeb88a60bb530910e16e2e605c7ef9e20a0d6bbb001",\n' +
-      '        "version": "v0.10-current"\n' +
-      '      },\n' +
-      '      "paymentKeyInfo": {\n' +
-      '        "address": {\n' +
-      '          "BTC": "1MRq8Vzb2pCVx9fcrBThWaV7reHhudt3ix",\n' +
-      '          "STACKS": "SP3G19B6J50FH6JGXAKS06N6WA1XPJCKKM4JCHC2D"\n' +
-      '        },\n' +
+      '      "keyInfo": {\n' +
+      '        "address": "SP3G19B6J50FH6JGXAKS06N6WA1XPJCKKM4JCHC2D"\n' +
       '        "index": 0,\n' +
       '        "privateKey": "56d30f2b605ed114c7dc45599ae521c525d07e1286fbab67452a6586ea49332a01"\n' +
       '      }\n' +
@@ -1990,25 +2126,25 @@ export const CLI_ARGS = {
           pattern: STACKS_ADDRESS_PATTERN
         },
         {
-          name: 'type',
-          type: 'string',
-          realtype: 'token-type',
-          pattern: `^${NAMESPACE_PATTERN}$|^STACKS$`
-        },
-        {
           name: 'amount',
           type: 'string',
           realtype: 'integer',
           pattern: '^[0-9]+$'
         },
         {
-          name: 'payment_key',
+          name: 'fee',
           type: 'string',
-          realtype: 'private_key',
-          pattern: `${PRIVATE_KEY_PATTERN_ANY}`
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
         },
         {
-          name: 'bitcoin_fee_key',
+          name: 'nonce',
+          type: 'string',
+          realtype: 'integer',
+          pattern: '^[0-9]+$'
+        },
+        {
+          name: 'payment_key',
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN_ANY}`
@@ -2029,48 +2165,32 @@ export const CLI_ARGS = {
       'via the `get_confirmations` command.  Once the transaction has 7 confirmations, the Blockstack peer network ' +
       'will have processed it, and your payment key balance and recipient balance will be updated.\n' +
       '\n' +
-      'At this time, token transfers are encoded as Bitcoin transactions.  As such, you will need to pay a transaction ' +
-      'fee in Bitcoin.  Your payment key should have both a Bitcoin balance and a Stacks balance (you can check with ' +
-      'the "balance" command).\n' +
-      '\n' +
       'Example:\n' +
       '\n' +
       '    $ # check balances of sender and recipient before sending.\n' +
       '    $ # address of the key below is SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    $ export PAYMENT="bfeffdf57f29b0cc1fab9ea197bb1413da2561fe4b83e962c7f02fbbe2b1cd5401"\n' +
-       '    $ export BTC_PAYMENT="4be95a5987ec727c033aa48a3fb1dbadb750446c1c63a02707a0b1c28e7ec17801"\n' +
       '    $ blockstack-cli balance SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    {\n' +
-      '      "BTC": "125500"\n' +
       '      "STACKS": "10000000"\n' +
       '    }\n' +
       '    $ blockstack-cli balance SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY\n' +
       '    {\n' +
-      '      "BTC": "0"\n' +
       '      "STACKS": "0"\n' +
       '    }\n' +
       '\n' +
       '    $ # send tokens\n' +
-      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY STACKS 12345 "$PAYMENT" "$BTC_PAYMENT"\n' +
+      '    $ blockstack-cli send_tokens SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY 12345 1 0 "$PAYMENT"\n' +
       '    a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
       '\n' +
-      '    $ # wait 7 confirmations\n' +
-      '    $ blockstack-cli get_confirmations a9d387a925fb0ba7a725fb1e11f2c3f1647473699dd5a147c312e6453d233456\n' +
-      '    {\n' +
-      '      "blockHeight": 567890,\n' +
-      '      "confirmations": 7,\n' +
-      '    }\n' +
+      '    $ # wait for transaction to be confirmed\n' +
       '\n' +
-      '    $ # check balance again.  The recipient receives some dust to encode the Stacks transfer,\n' +
-      '    $ # and the sender pays for the transaction fee.\n' +
       '    $ blockstack-cli balance SP2SC16ASH76GX549PT7J5WQZA4GHMFBKYMBQFF9V\n' +
       '    {\n' +
-      '      "BTC": "117000"\n' +
       '      "STACKS": "9987655"\n' +
       '    }\n' +
       '    $ blockstack-cli balance SP1P10PS2T517S4SQGZT5WNX8R00G1ECTRKYCPMHY\n' +
       '    {\n' +
-      '      "BTC": "5500"\n' +
       '      "STACKS": "12345"\n' +
       '    }\n' +
       '\n',
@@ -2366,7 +2486,7 @@ export const CLI_ARGS = {
           type: 'string',
           realtype: 'private_key',
           pattern: `${PRIVATE_KEY_PATTERN}`
-        },
+        }
       ],
       minItems: 3,
       maxItems: 3,
@@ -2461,6 +2581,10 @@ Options can be:
     -T URL              Use an alternative Blockstack transaction broadcaster.
     
     -X URL              Use an alternative UTXO service endpoint.
+
+    -u USERNAME         A username to be passed to bitcoind RPC endpoints
+
+    -p PASSWORD         A password to be passed to bitcoind RPC endpoints
 `;
 
 /*
@@ -2740,7 +2864,7 @@ interface CLI_OPTS {
 };
 
 export function getCLIOpts(argv: string[],
-  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:X:') : CLI_OPTS {
+  opts: string = 'deitUxC:F:B:P:D:G:N:H:T:I:m:M:X:u:p:') : CLI_OPTS {
   const optsTable : CLI_OPTS = {};
   const remainingArgv = [];
   const argvBuff = argv.slice(0);
