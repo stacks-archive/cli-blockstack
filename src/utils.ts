@@ -448,10 +448,12 @@ export function checkUrl(url: string) : string {
 /*
  * Sign a profile into a JWT
  */
+// @ts-ignore
 export function makeProfileJWT(profileData: Object, privateKey: string) : string {
   const signedToken = blockstack.signProfileToken(profileData, privateKey);
   const wrappedToken = blockstack.wrapProfileToken(signedToken);
   const tokenRecords = [wrappedToken];
+  // @ts-ignore
   return JSONStringify(tokenRecords);
 }
 
